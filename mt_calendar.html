@@ -3,145 +3,858 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ปฏิทินงานซ่อมบำรุง - มหาสวัสดิ์</title>
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- FullCalendar CSS -->
+    <title>ระบบกำหนดการงานซ่อมบำรุง - โรงงานผลิตน้ำมหาสวัสดิ์</title>
+    
+    <!-- Tailwind CSS for Premium UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        mwaBlue: {
+                            light: '#e0f2fe',
+                            DEFAULT: '#0284c7',
+                            dark: '#0369a1',
+                            deep: '#0f172a'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Google Fonts: Sarabun -->
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- FullCalendar CSS/JS -->
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+    
+    <!-- PDF.js to render first page of PDFs directly in browser for Gemini processing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    
+    <!-- Firebase Legacy Compat SDKs (Essential for standard browser embedding) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
     <style>
-        body { background-color: #f4f6f9; font-family: 'Sarabun', sans-serif; }
-        .card { box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: none; }
-        #calendar { max-width: 100%; height: 600px; background: white; padding: 20px; border-radius: 10px; }
-        .loading { display: none; color: #0d6efd; font-weight: bold; }
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f8fafc;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
     </style>
 </head>
-<body>
+<body class="min-h-screen text-slate-800 flex flex-col">
 
-<div class="container py-4">
-    <h2 class="text-center mb-4 text-primary">🗓️ ระบบกำหนดการงานซ่อมบำรุง (Mockup)</h2>
-    
-    <div class="row">
-        <!-- Sidebar: Upload & Form -->
-        <div class="col-md-4 mb-4">
-            <div class="card p-3">
-                <h5 class="card-title">1. อัปโหลดเอกสารขอซ่อม</h5>
-                <input class="form-control mb-2" type="file" id="fileInput" accept="image/*,.pdf">
-                <p class="loading mt-2" id="loadingText">⏳ AI กำลังสกัดข้อมูลจากหน้าแรก...</p>
-
-                <hr>
-
-                <h5 class="card-title">2. ตรวจสอบข้อมูล (AI Extract)</h5>
-                <form id="eventForm">
-                    <div class="mb-2">
-                        <label class="form-label text-muted small">วันที่ซ่อมบำรุง</label>
-                        <input type="date" class="form-control" id="evtDate" required>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label text-muted small">เวลา</label>
-                        <input type="time" class="form-control" id="evtTime" required>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label text-muted small">รายละเอียดงาน</label>
-                        <input type="text" class="form-control" id="evtDetail" placeholder="เช่น เปลี่ยนวาล์วท่อส่งน้ำ" required>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label text-muted small">สถานที่</label>
-                        <input type="text" class="form-control" id="evtLocation" placeholder="เช่น อาคารสูบน้ำแรงต่ำ" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label text-muted small">หน่วยงานต้นทาง</label>
-                        <input type="text" class="form-control" id="evtDept" placeholder="เช่น กองซ่อมบำรุง" required>
-                    </div>
-                    <button type="submit" class="btn btn-success w-100" id="saveBtn" disabled>📌 บันทึกลงปฏิทิน</button>
-                </form>
+    <!-- NAV BAR -->
+    <header class="bg-gradient-to-r from-mwaBlue-deep via-mwaBlue-dark to-mwaBlue text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-white p-2 rounded-full shadow-inner">
+                    <!-- Modern SVG Water Droplet with Gear (MWA Maintenance Concept) -->
+                    <svg class="w-8 h-8 text-mwaBlue" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0zM12 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm2-10h-4v2h4zm0 3h-4v2h4z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-wide">กผจ. มหาสวัสดิ์</h1>
+                    <p class="text-xs text-mwaBlue-light">ระบบแจ้งกำหนดการงานซ่อมบำรุงอัจฉริยะ</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <!-- Database Connection Status Badge -->
+                <span id="dbStatusBadge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-200 border border-amber-500/30">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                    กำลังตรวจสอบการเชื่อมต่อ...
+                </span>
+                
+                <!-- Settings Button (Gear) -->
+                <button onclick="toggleSettingsModal(true)" class="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors" title="ตั้งค่าระบบ">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                </button>
             </div>
         </div>
+    </header>
 
-        <!-- Main: Calendar -->
-        <div class="col-md-8">
-            <div class="card p-3">
-                <h5 class="card-title">3. ปฏิทินกำหนดการ (รายเดือน)</h5>
-                <div id="calendar"></div>
+    <!-- CONTENT WRAPPER -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- SIDEBAR: UPLOAD & FORM CONTROL (lg:col-span-4) -->
+        <section class="lg:col-span-4 flex flex-col gap-6">
+            
+            <!-- ADMIN ACCESS TOGGLE -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-mwaBlue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                        <span class="font-medium text-slate-700">สิทธิ์ผู้ดูแลระบบ (ผอ.กผจ.)</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="adminToggle" onchange="toggleAdminMode()" class="sr-only peer">
+                        <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-mwaBlue"></div>
+                    </label>
+                </div>
+                <p class="text-xs text-slate-400 mt-2">เปิดใช้งานโหมดแอดมิน เพื่อทำการอัปโหลดไฟล์ บันทึก หรือลบกำหนดการ</p>
+            </div>
+
+            <!-- EVENT CONFIGURATION SECTION (ADMIN ONLY) -->
+            <div id="adminPanel" class="hidden bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col gap-5 transition-all">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <span>1. สแกนและเพิ่มเอกสาร</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-1">อัปโหลดไฟล์บันทึกข้อความเพื่อวิเคราะห์ข้อมูลแบบอัตโนมัติ</p>
+                </div>
+
+                <!-- DRAG & DROP UPLOAD ZONE -->
+                <div class="border-2 border-dashed border-slate-300 hover:border-mwaBlue transition-colors rounded-lg p-6 text-center cursor-pointer relative" id="dropzone" onclick="document.getElementById('fileInput').click()">
+                    <input type="file" id="fileInput" class="hidden" accept="image/png, image/jpeg, image/jpg, application/pdf" onchange="handleFileSelected(event)">
+                    <div class="flex flex-col items-center gap-2">
+                        <svg class="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <p class="text-sm font-medium text-slate-600">คลิกเพื่อเลือกไฟล์ หรือ ลากไฟล์มาวางที่นี่</p>
+                        <p class="text-xs text-slate-400">รองรับรูปภาพ JPG, PNG หรือไฟล์เอกสาร PDF (หน้าแรก)</p>
+                    </div>
+                </div>
+
+                <!-- SELECTED FILE DISPLAY -->
+                <div id="fileInfoBox" class="hidden p-3 bg-slate-50 rounded-lg flex items-center justify-between border border-slate-100">
+                    <div class="flex items-center gap-2 overflow-hidden">
+                        <svg class="w-5 h-5 text-mwaBlue flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <span id="fileName" class="text-xs font-medium text-slate-600 truncate">document.pdf</span>
+                    </div>
+                    <button onclick="clearSelectedFile()" class="text-rose-500 hover:text-rose-700 text-xs font-semibold p-1">ยกเลิก</button>
+                </div>
+
+                <!-- AI SCANNER ANIMATION & STEPPER -->
+                <div id="aiLoader" class="hidden bg-mwaBlue-light/40 border border-mwaBlue/20 p-4 rounded-lg flex flex-col gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-5 h-5 border-2 border-mwaBlue border-t-transparent rounded-full animate-spin"></div>
+                        <span class="text-sm font-semibold text-mwaBlue-dark">Gemini 2.5 Flash กำลังประมวลผล...</span>
+                    </div>
+                    <div class="text-xs text-slate-500 flex flex-col gap-1 pl-8 list-disc">
+                        <div id="step-render" class="transition-opacity">● กำลังเตรียมสแกนรูปเอกสาร...</div>
+                        <div id="step-api" class="opacity-40 transition-opacity">● กำลังส่งวิเคราะห์โครงสร้างข้อมูล...</div>
+                        <div id="step-done" class="opacity-40 transition-opacity">● สกัดข้อมูลเสร็จสมบูรณ์</div>
+                    </div>
+                </div>
+
+                <hr class="border-slate-100">
+
+                <!-- MAIN VERIFICATION FORM -->
+                <form id="scheduleForm" onsubmit="saveSchedule(event)" class="flex flex-col gap-4">
+                    <div>
+                        <h4 class="text-sm font-semibold text-slate-700 mb-2">2. ตรวจสอบรายละเอียดงานซ่อม</h4>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1">วันที่ซ่อมบำรุง</label>
+                            <input type="date" id="formDate" required class="w-full text-sm px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mwaBlue focus:bg-white transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1">เวลาเริ่มดำเนินการ</label>
+                            <input type="time" id="formTime" required class="w-full text-sm px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mwaBlue focus:bg-white transition-all">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">รายละเอียดงานซ่อม</label>
+                        <input type="text" id="formDetail" required placeholder="เช่น บำรุงรักษาหม้อแปลงไฟฟ้าแรงสูง" class="w-full text-sm px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mwaBlue focus:bg-white transition-all">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">สถานที่หน้างาน</label>
+                        <input type="text" id="formLocation" required placeholder="เช่น โรงสูบน้ำแรงต่ำ อาคาร 1" class="w-full text-sm px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mwaBlue focus:bg-white transition-all">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">หน่วยงานต้นทางผู้ส่งเรื่อง</label>
+                        <input type="text" id="formDept" required placeholder="เช่น กซอ. หรือ กผจ." class="w-full text-sm px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mwaBlue focus:bg-white transition-all">
+                    </div>
+
+                    <button type="submit" class="w-full bg-mwaBlue hover:bg-mwaBlue-dark text-white font-medium text-sm py-2.5 px-4 rounded-lg shadow-md transition-all flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                        บันทึกลงปฏิทินกลาง
+                    </button>
+                </form>
+            </div>
+
+            <!-- PUBLIC READONLY INFO PANEL -->
+            <div id="viewerPanel" class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                <div class="flex items-center gap-3 text-emerald-600 mb-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                    <h3 class="font-bold text-slate-800">โหมดสำหรับผู้เยี่ยมชม</h3>
+                </div>
+                <p class="text-sm text-slate-600 leading-relaxed">
+                    คุณกำลังรับชมปฏิทินกำหนดการแบบ **Real-time** ของโรงงานผลิตน้ำมหาสวัสดิ์ ทุกๆ ข้อมูลที่ผู้บริหารหรือแอดมินแก้ไขจะสตรีมมิ่งแสดงผลบนหน้านี้โดยอัตโนมัติโดยไม่ต้องรีเฟรชหน้าจอ
+                </p>
+                <div class="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-2">
+                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">สัญลักษณ์สีประจำหน่วยงาน</div>
+                    <div class="grid grid-cols-2 gap-2 mt-1">
+                        <div class="flex items-center gap-1.5 text-xs text-slate-600"><span class="w-3 h-3 rounded bg-blue-600"></span>กซอ. (ซ่อมอุปกรณ์)</div>
+                        <div class="flex items-center gap-1.5 text-xs text-slate-600"><span class="w-3 h-3 rounded bg-emerald-600"></span>กผจ. (ผลิต/จ่ายน้ำ)</div>
+                        <div class="flex items-center gap-1.5 text-xs text-slate-600"><span class="w-3 h-3 rounded bg-amber-500"></span>ผสว. / สว.</div>
+                        <div class="flex items-center gap-1.5 text-xs text-slate-600"><span class="w-3 h-3 rounded bg-rose-600"></span>กองไฟฟ้า / งานไฟฟ้า</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- MAIN CALENDAR CARD (lg:col-span-8) -->
+        <section class="lg:col-span-8 flex flex-col gap-6">
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-6 flex flex-col gap-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-bold text-slate-800">🗓️ ปฏิทินกำหนดการซ่อมบำรุงโรงงาน</h2>
+                    <div class="text-xs text-slate-400 font-medium" id="totalJobsCounter">ทั้งหมด 0 รายการ</div>
+                </div>
+                <!-- CALENDAR CANVAS CONTAINER -->
+                <div class="overflow-x-auto">
+                    <div id="calendar" class="min-w-[600px] h-[550px]"></div>
+                </div>
+            </div>
+        </section>
+        
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-slate-900 text-slate-400 py-6 border-t border-slate-800 text-center text-xs">
+        <p>© 2026 ระบบปฏิทินงานซ่อมบำรุง โรงงานผลิตน้ำมหาสวัสดิ์ • การประปานครหลวง</p>
+    </footer>
+
+    <!-- SETTINGS / BACKEND CONFIGURATION MODAL -->
+    <div id="settingsModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 flex flex-col">
+            <div class="bg-gradient-to-r from-mwaBlue to-mwaBlue-dark text-white px-5 py-4 flex items-center justify-between">
+                <h3 class="font-bold">⚙️ ตั้งค่าความเชื่อมต่อระบบ (สำหรับ Developer)</h3>
+                <button onclick="toggleSettingsModal(false)" class="text-white hover:text-slate-200 text-xl font-bold">×</button>
+            </div>
+            <div class="p-5 flex flex-col gap-4 max-h-[80vh] overflow-y-auto">
+                <p class="text-xs text-slate-500 leading-relaxed">
+                    คุณสามารถนำรหัสเชื่อมต่อต่างๆ (API Keys) มาป้อนตรงนี้ ระบบจะบันทึกแบบออฟไลน์ลงในเบราว์เซอร์เครื่องนี้อย่างปลอดภัยเพื่อให้สามารถใช้งานร่วมกับฐานข้อมูลภายนอกได้
+                </p>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Gemini API Key</label>
+                    <input type="password" id="setGeminiKey" placeholder="AIZAsy..." class="w-full text-xs px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-mwaBlue">
+                    <p class="text-[10px] text-slate-400 mt-1">ใช้สำหรับการสกัดข้อความในหน้าเอกสารใบขอซ่อม</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">รหัสผ่านยืนยันตัวตนโหมดแอดมิน</label>
+                    <input type="password" id="setAdminPass" placeholder="ตั้งรหัสแอดมินเริ่มต้น (ว่างไว้หากไม่ต้องการใช้)" class="w-full text-xs px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-mwaBlue">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Firebase Config (JSON)</label>
+                    <textarea id="setFirebaseConfig" rows="4" placeholder='{ "apiKey": "...", "authDomain": "...", "projectId": "...", ... }' class="w-full text-xs px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-mwaBlue font-mono" style="font-family: monospace;"></textarea>
+                    <p class="text-[10px] text-slate-400 mt-1">คัดลอก SDK Config (JSON) จาก Firebase Console มาวางที่นี่เพื่อให้ฐานข้อมูลออนไลน์รันได้ทันที</p>
+                </div>
+                <div class="bg-slate-50 p-3 rounded border border-slate-200">
+                    <span class="text-xs font-semibold text-slate-600">สถานะระบุพิกัดฐานข้อมูล:</span>
+                    <p class="text-[11px] text-slate-500 mt-1" id="firebaseConfigInfo">ระบบกำลังตรวจหา Configuration ของ Firebase...</p>
+                </div>
+                <div class="flex gap-2 justify-end mt-2">
+                    <button onclick="toggleSettingsModal(false)" class="text-xs px-4 py-2 border border-slate-300 rounded text-slate-600 hover:bg-slate-50">ยกเลิก</button>
+                    <button onclick="saveSettings()" class="text-xs px-4 py-2 bg-mwaBlue text-white rounded hover:bg-mwaBlue-dark font-medium">บันทึกค่าลงเครื่อง</button>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Initialize Calendar
-        var calendarEl = document.getElementById('calendar');
-        var calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'dayGridMonth',
-            locale: 'th',
-            headerToolbar: {
-                left: 'prev,next today',
-                center: 'title',
-                right: 'dayGridMonth'
-            },
-            events: [] // เริ่มต้นแบบปฏิทินว่างๆ
-        });
-        calendar.render();
+    <!-- EVENT DETAILS MODAL -->
+    <div id="eventDetailsModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full overflow-hidden border border-slate-100 flex flex-col">
+            <div class="bg-slate-100 px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+                <span id="detailBadgeDept" class="px-2 py-0.5 rounded text-xs font-bold text-white bg-slate-500">กซอ.</span>
+                <h3 class="font-bold text-slate-800">รายละเอียดกำหนดการ</h3>
+                <button onclick="toggleEventDetailsModal(false)" class="text-slate-400 hover:text-slate-600 text-xl font-bold">×</button>
+            </div>
+            <div class="p-5 flex flex-col gap-4">
+                <div>
+                    <span class="text-xs text-slate-400 block">งานซ่อมบำรุง</span>
+                    <span id="detailJobName" class="text-base font-bold text-slate-800">-</span>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-xs text-slate-400 block">วันที่</span>
+                        <span id="detailDate" class="text-sm font-medium text-slate-700">-</span>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-400 block">เวลาดำเนินการ</span>
+                        <span id="detailTime" class="text-sm font-medium text-slate-700">-</span>
+                    </div>
+                </div>
+                <div>
+                    <span class="text-xs text-slate-400 block">สถานที่หน้างาน</span>
+                    <span id="detailLocation" class="text-sm font-medium text-slate-700">-</span>
+                </div>
+                <div>
+                    <span class="text-xs text-slate-400 block">หน่วยงานต้นทาง</span>
+                    <span id="detailDept" class="text-sm font-medium text-slate-700">-</span>
+                </div>
+                
+                <input type="hidden" id="detailId">
+                
+                <div id="adminDeleteBtnContainer" class="hidden pt-4 border-t border-slate-100">
+                    <button onclick="deleteEvent()" class="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 text-xs font-semibold py-2 rounded-lg transition-colors flex items-center justify-center gap-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        ลบข้อมูลกำหนดการนี้
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        // Elements
-        const fileInput = document.getElementById('fileInput');
-        const loadingText = document.getElementById('loadingText');
-        const eventForm = document.getElementById('eventForm');
-        const saveBtn = document.getElementById('saveBtn');
+    <!-- MAIN JAVASCRIPT LOGIC -->
+    <script>
+        // Setup PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-        // Mockup AI Extraction
-        fileInput.addEventListener('change', function() {
-            if(this.files.length > 0) {
-                loadingText.style.display = 'block';
-                saveBtn.disabled = true;
-                eventForm.reset();
+        // Globals
+        let calendar = null;
+        let isFirebaseActive = false;
+        let db = null;
+        let auth = null;
+        let userInstance = null;
+        let currentEvents = []; // Backup local if Firebase offline
 
-                // จำลองเวลาให้ AI ทำงาน 2 วินาที แล้วเด้งข้อมูลจำลองขึ้นมา
-                setTimeout(() => {
-                    loadingText.style.display = 'none';
-                    
-                    // ข้อมูลจำลองที่สกัดได้
-                    const today = new Date().toISOString().split('T')[0];
-                    document.getElementById('evtDate').value = today;
-                    document.getElementById('evtTime').value = "09:30";
-                    document.getElementById('evtDetail').value = "ซ่อมบำรุงเครื่องสูบน้ำตะกอน (ต.1)";
-                    document.getElementById('evtLocation').value = "โรงตกตะกอน 1";
-                    document.getElementById('evtDept').value = "กซอ.";
+        // Gemini API Config
+        const apiKey = ""; // Keep blank, environment will insert automatically or we fallback to local storage input
 
-                    saveBtn.disabled = false;
-                }, 2000);
-            }
-        });
+        // Environment variables injected at runtime
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'mahasawat-mt-calendar';
 
-        // Save to Calendar
-        eventForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const date = document.getElementById('evtDate').value;
-            const time = document.getElementById('evtTime').value;
-            const detail = document.getElementById('evtDetail').value;
-            const location = document.getElementById('evtLocation').value;
-            const dept = document.getElementById('evtDept').value;
+        // Load configuration and init app on window load
+        window.onload = function() {
+            initApp();
+        };
 
-            // นำข้อมูลไปสร้าง Event ในปฏิทิน
-            calendar.addEvent({
-                title: `${time} - ${detail} (${location})`,
-                start: `${date}T${time}:00`,
-                extendedProps: {
-                    department: dept
+        // Initialize application and full calendar
+        async function initApp() {
+            // Setup Settings Form Values
+            document.getElementById('setGeminiKey').value = localStorage.getItem('gemini_api_key') || '';
+            document.getElementById('setAdminPass').value = localStorage.getItem('admin_pass') || '';
+            document.getElementById('setFirebaseConfig').value = localStorage.getItem('firebase_config') || '';
+
+            // Init FullCalendar instance
+            const calendarEl = document.getElementById('calendar');
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                locale: 'th',
+                firstDay: 1, // Start week on Monday
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth'
                 },
-                backgroundColor: '#198754',
-                borderColor: '#198754'
+                buttonText: {
+                    today: 'วันนี้',
+                    month: 'เดือน'
+                },
+                events: [],
+                eventClick: function(info) {
+                    showEventDetails(info.event);
+                }
+            });
+            calendar.render();
+
+            // Attempt Firebase Connection
+            const firebaseInitialized = await setupFirebase();
+            if (!firebaseInitialized) {
+                // Fallback to LocalStorage mode
+                isFirebaseActive = false;
+                updateStatusBadge(false, "โหมด Local (บันทึกข้อมูลในเครื่อง)");
+                document.getElementById('firebaseConfigInfo').innerText = "ทำงานแบบ Local (บันทึกออฟไลน์ในบราวเซอร์ของคอมพิวเตอร์เครื่องนี้เท่านั้น)";
+                loadLocalEvents();
+            }
+        }
+
+        // Firebase Setup & Listeners (Following Strict Setup Rules)
+        async function setupFirebase() {
+            // Check in-platform config first, then check localStorage input
+            let firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
+            if (!firebaseConfigStr || firebaseConfigStr === "") {
+                firebaseConfigStr = localStorage.getItem('firebase_config');
+            }
+
+            if (firebaseConfigStr && firebaseConfigStr.trim() !== "") {
+                try {
+                    const firebaseConfig = JSON.parse(firebaseConfigStr);
+                    firebase.initializeApp(firebaseConfig);
+                    auth = firebase.auth();
+                    db = firebase.firestore();
+
+                    // RULE 3: Auth Before Queries
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        const credential = await auth.signInWithCustomToken(__initial_auth_token);
+                        userInstance = credential.user;
+                    } else {
+                        const credential = await auth.signInAnonymously();
+                        userInstance = credential.user;
+                    }
+
+                    isFirebaseActive = true;
+                    updateStatusBadge(true, "เชื่อมต่อ Firebase Cloud แล้ว");
+                    document.getElementById('firebaseConfigInfo').innerText = "เชื่อมโยงกับโครงการ Firebase ภายนอกเรียบร้อย ระบบพร้อมสตรีมข้อมูล";
+                    
+                    // Hook Live Data Listener
+                    listenToCalendarEvents();
+                    return true;
+                } catch (e) {
+                    console.warn("Failed to connect with Firebase configuration, fallback to local storage:", e);
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        // Realtime Listener for Firestore (Following Strict Path Rules)
+        function listenToCalendarEvents() {
+            if (!db || !isFirebaseActive) return;
+
+            // RULE 1: Strict paths for public data
+            const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('events');
+
+            // RULE 2: No Complex Queries, fetch all and manage in JS
+            docRef.onSnapshot((querySnapshot) => {
+                const events = [];
+                querySnapshot.forEach((doc) => {
+                    events.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+                currentEvents = events;
+                populateCalendar(events);
+            }, (error) => {
+                console.error("Firestore listener error:", error);
+                showNotification("เกิดข้อผิดพลาดในการดึงข้อมูลฐานข้อมูล Cloud", "error");
+            });
+        }
+
+        // Setup LocalStorage fallbacks if Firebase not connected
+        function loadLocalEvents() {
+            const localData = localStorage.getItem(`events_${appId}`);
+            if (localData) {
+                currentEvents = JSON.parse(localData);
+            } else {
+                currentEvents = [];
+            }
+            populateCalendar(currentEvents);
+        }
+
+        function saveLocalEvents(events) {
+            localStorage.setItem(`events_${appId}`, JSON.stringify(events));
+            populateCalendar(events);
+        }
+
+        // Populate events from raw array to FullCalendar format
+        function populateCalendar(eventsList) {
+            if (!calendar) return;
+
+            // Remove existing
+            calendar.removeAllEvents();
+
+            // Format to FullCalendar standard and add to calendar
+            const fcEvents = eventsList.map(evt => {
+                const isUrgent = evt.detail.includes("ด่วน");
+                return {
+                    id: evt.id,
+                    title: `[${evt.department}] ${evt.detail}`,
+                    start: `${evt.date}T${evt.time}:00`,
+                    backgroundColor: getDeptColor(evt.department, isUrgent),
+                    borderColor: getDeptColor(evt.department, isUrgent),
+                    extendedProps: {
+                        department: evt.department,
+                        detail: evt.detail,
+                        location: evt.location,
+                        time: evt.time,
+                        date: evt.date
+                    }
+                };
             });
 
-            // เคลียร์ฟอร์ม
-            eventForm.reset();
-            fileInput.value = '';
-            saveBtn.disabled = true;
-            alert('✅ บันทึกกำหนดการลงปฏิทินเรียบร้อยแล้ว');
-        });
-    });
-</script>
+            calendar.addEventSource(fcEvents);
+            document.getElementById('totalJobsCounter').innerText = `ทั้งหมด ${eventsList.length} รายการ`;
+        }
 
+        // Color coding by department
+        function getDeptColor(dept, isUrgent = false) {
+            if (isUrgent) return '#dc2626'; // High-vis Red for urgent repairs
+            const code = (dept || '').toUpperCase();
+            if (code.includes('กซอ')) return '#2563eb'; // blue
+            if (code.includes('กผจ')) return '#059669'; // emerald
+            if (code.includes('ผสว') || code.includes('สว')) return '#d97706'; // amber
+            if (code.includes('ไฟ')) return '#9333ea'; // purple
+            return '#475569'; // slate gray default
+        }
+
+        // Manage UI Badge based on database status
+        function updateStatusBadge(online, text) {
+            const badge = document.getElementById('dbStatusBadge');
+            if (online) {
+                badge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-200 border border-emerald-500/30";
+                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>${text}`;
+            } else {
+                badge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-200 border border-indigo-500/30";
+                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-indigo-500"></span>${text}`;
+            }
+        }
+
+        // Admin Access controls
+        function toggleAdminMode() {
+            const isChecked = document.getElementById('adminToggle').checked;
+            const adminPass = localStorage.getItem('admin_pass') || '';
+            const adminPanel = document.getElementById('adminPanel');
+
+            if (isChecked) {
+                if (adminPass !== '') {
+                    const promptVal = prompt('กรุณาป้อนรหัสผ่านโหมดผู้ดูแลระบบ:');
+                    if (promptVal !== adminPass) {
+                        alert('❌ รหัสผ่านไม่ถูกต้อง');
+                        document.getElementById('adminToggle').checked = false;
+                        adminPanel.classList.add('hidden');
+                        return;
+                    }
+                }
+                adminPanel.classList.remove('hidden');
+                showNotification("เปิดใช้งานสิทธิ์แอดมิน (ผอ.กผจ.) แล้ว", "success");
+            } else {
+                adminPanel.classList.add('hidden');
+                showNotification("ปิดการทำงานโหมดแอดมินเรียบร้อย", "info");
+            }
+        }
+
+        // UI trigger for global notifications (No browser alerts inside iframe)
+        function showNotification(message, type = "success") {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg border text-sm font-medium transition-all duration-300 transform translate-y-10 opacity-0`;
+            
+            if (type === "success") {
+                alertDiv.className += " bg-emerald-50 border-emerald-200 text-emerald-800";
+            } else if (type === "error") {
+                alertDiv.className += " bg-rose-50 border-rose-200 text-rose-800";
+            } else {
+                alertDiv.className += " bg-slate-50 border-slate-200 text-slate-800";
+            }
+            
+            alertDiv.innerText = message;
+            document.body.appendChild(alertDiv);
+            
+            setTimeout(() => {
+                alertDiv.classList.remove('translate-y-10', 'opacity-0');
+            }, 50);
+
+            setTimeout(() => {
+                alertDiv.classList.add('translate-y-10', 'opacity-0');
+                setTimeout(() => alertDiv.remove(), 300);
+            }, 4000);
+        }
+
+        // PDF renderer helper (Renders page 1 to Canvas base64)
+        async function getPdfFirstPageBase64(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            const page = await pdf.getPage(1);
+            
+            const viewport = page.getViewport({ scale: 1.5 });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            
+            await page.render({ canvasContext: context, viewport: viewport }).promise;
+            return canvas.toDataURL('image/png').split(',')[1];
+        }
+
+        // Image to Base64 utility
+        async function getImageBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    resolve(reader.result.split(',')[1]);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // File Selection controller
+        async function handleFileSelected(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('fileName').innerText = file.name;
+            document.getElementById('fileInfoBox').classList.remove('hidden');
+
+            // Trigger AI Extractor
+            await analyzeDocumentWithAI(file);
+        }
+
+        function clearSelectedFile() {
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileInfoBox').classList.add('hidden');
+            document.getElementById('aiLoader').classList.add('hidden');
+        }
+
+        // Core AI processing function via Gemini 2.5 Flash API
+        async function analyzeDocumentWithAI(file) {
+            const loader = document.getElementById('aiLoader');
+            const stepRender = document.getElementById('step-render');
+            const stepApi = document.getElementById('step-api');
+            const stepDone = document.getElementById('step-done');
+
+            loader.classList.remove('hidden');
+            stepRender.classList.remove('opacity-40');
+            stepApi.classList.add('opacity-40');
+            stepDone.classList.add('opacity-40');
+
+            try {
+                // Get active API Key
+                const currentApiKey = apiKey || localStorage.getItem('gemini_api_key') || "";
+                if (!currentApiKey) {
+                    throw new Error("ไม่มี API Key: กรุณากดปุ่มตั้งค่า (ฟันเฟือง) ด้านขวาบน เพื่อป้อน Gemini API Key ของคุณ");
+                }
+
+                // Step 1: Prepare data & render
+                let base64Data = "";
+                if (file.type === "application/pdf") {
+                    base64Data = await getPdfFirstPageBase64(file);
+                } else {
+                    base64Data = await getImageBase64(file);
+                }
+
+                stepApi.classList.remove('opacity-40');
+
+                // Step 2: Make API Call to Gemini 2.5 Flash (with Exponential Backoff)
+                const responseText = await callGeminiWithRetry(base64Data, currentApiKey);
+                
+                // Step 3: Populate extracted data to verify form
+                const responseData = JSON.parse(responseText);
+                
+                if (responseData) {
+                    document.getElementById('formDate').value = responseData.date || '';
+                    document.getElementById('formTime').value = responseData.time || '';
+                    document.getElementById('formDetail').value = responseData.detail || '';
+                    document.getElementById('formLocation').value = responseData.location || '';
+                    document.getElementById('formDept').value = responseData.department || '';
+
+                    stepDone.classList.remove('opacity-40');
+                    showNotification("วิเคราะห์ข้อมูลเอกสารหน้าแรกเสร็จเรียบร้อย! โปรดตรวจสอบข้อมูลก่อนบันทึก", "success");
+                }
+
+            } catch (err) {
+                console.error("AI Error:", err);
+                showNotification(err.message || "เกิดข้อผิดพลาดในการวิเคราะห์เอกสาร", "error");
+            } finally {
+                // Keep loader visible for visual cue or let users see steps completed
+                setTimeout(() => {
+                    loader.classList.add('hidden');
+                }, 1000);
+            }
+        }
+
+        // Retries Gemini API with exponential backoff as per specs
+        async function callGeminiWithRetry(base64Image, key, retries = 5, delay = 1000) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${key}`;
+            
+            const prompt = `คุณคือผู้ช่วยสกัดข้อมูลเอกสารบันทึกข้อความ ของโรงงานผลิตน้ำมหาสวัสดิ์ 
+วิเคราะห์รูปภาพเอกสารใบซ่อมแซมหรือใบขออนุมัตินี้ และสรุปข้อมูลออกมาเป็นวัตถุโครงสร้าง JSON ตามคุณสมบัติเหล่านี้อย่างแม่นยำ:
+1. "date" (ค่าข้อความรูป YYYY-MM-DD หากไม่มีปีให้ใช้ปีปัจจุบัน 2026)
+2. "time" (เวลาเริ่มต้นซ่อมบำรุงในเอกสาร รูป HH:MM หากไม่ระบุใช้ "08:30")
+3. "detail" (สรุปชื่องานซ่อมสั้นๆ ให้กระชับความกว้างไม่เกิน 50 ตัวอักษร)
+4. "location" (สถานที่ติดตั้งอุปกรณ์ซ่อมในโรงงาน)
+5. "department" (ชื่อตัวย่อฝ่ายขอซ่อม เช่น กซอ., กผจ.)`;
+
+            const payload = {
+                contents: [
+                    {
+                        parts: [
+                            { text: prompt },
+                            {
+                                inlineData: {
+                                    mimeType: "image/png",
+                                    data: base64Image
+                                }
+                            }
+                        ]
+                    }
+                ],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            date: { type: "STRING" },
+                            time: { type: "STRING" },
+                            detail: { type: "STRING" },
+                            location: { type: "STRING" },
+                            department: { type: "STRING" }
+                        },
+                        required: ["date", "time", "detail", "location", "department"]
+                    }
+                }
+            };
+
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP Error Status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (!text) throw new Error("ไม่พบคอนเทนต์ผลลัพธ์ตอบกลับจาก Gemini");
+                    
+                    return text;
+                } catch (err) {
+                    if (i === retries - 1) throw err; // Final fail
+                    await new Promise(r => setTimeout(r, delay));
+                    delay *= 2; // Exponential backoff scaling
+                }
+            }
+        }
+
+        // Form Submit Handler to save schedules
+        async function saveSchedule(event) {
+            event.preventDefault();
+
+            const payload = {
+                date: document.getElementById('formDate').value,
+                time: document.getElementById('formTime').value,
+                detail: document.getElementById('formDetail').value,
+                location: document.getElementById('formLocation').value,
+                department: document.getElementById('formDept').value
+            };
+
+            if (isFirebaseActive && db) {
+                try {
+                    // Save to Firestore (Rule 1 Strict Path)
+                    const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('events');
+                    await docRef.add(payload);
+                    showNotification("ซิงค์กำหนดการซ่อมบำรุงลงฐานข้อมูลคลาวด์แล้ว", "success");
+                } catch (error) {
+                    console.error("Firestore Save Fail:", error);
+                    showNotification("บันทึกลง Firebase ล้มเหลว! กำลังเก็บในรูปแบบ Local แทน", "error");
+                    saveLocalFallback(payload);
+                }
+            } else {
+                saveLocalFallback(payload);
+            }
+
+            // Reset UI States
+            document.getElementById('scheduleForm').reset();
+            clearSelectedFile();
+        }
+
+        // LocalStorage save flow
+        function saveLocalFallback(payload) {
+            const customId = "local_" + Date.now();
+            const newEvent = { id: customId, ...payload };
+            currentEvents.push(newEvent);
+            saveLocalEvents(currentEvents);
+            showNotification("บันทึกตารางซ่อมบำรุงลงในเครื่องส่วนตัวสำเร็จ", "success");
+        }
+
+        // Event deletion controller
+        async function deleteEvent() {
+            const eventId = document.getElementById('detailId').value;
+            if (!eventId) return;
+
+            if (!confirm("คุณต้องการลบตารางเวลานี้อย่างถาวรใช่หรือไม่?")) return;
+
+            if (isFirebaseActive && db) {
+                try {
+                    const docRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('events').doc(eventId);
+                    await docRef.delete();
+                    showNotification("ลบงานซ่อมบำรุงเรียบร้อยแล้ว", "success");
+                } catch (err) {
+                    console.error("Delete Fail:", err);
+                    showNotification("ไม่สามารถลบข้อมูลจาก Cloud ได้", "error");
+                }
+            } else {
+                currentEvents = currentEvents.filter(e => e.id !== eventId);
+                saveLocalEvents(currentEvents);
+                showNotification("ลบงานซ่อมบำรุงในเครื่องเรียบร้อยแล้ว", "success");
+            }
+
+            toggleEventDetailsModal(false);
+        }
+
+        // Calendar Detail Modals
+        function showEventDetails(fcEvent) {
+            const props = fcEvent.extendedProps;
+            document.getElementById('detailId').value = fcEvent.id;
+            document.getElementById('detailJobName').innerText = props.detail;
+            document.getElementById('detailDate').innerText = props.date;
+            document.getElementById('detailTime').innerText = props.time;
+            document.getElementById('detailLocation').innerText = props.location;
+            document.getElementById('detailDept').innerText = props.department;
+
+            // Setup Badge Category
+            const badge = document.getElementById('detailBadgeDept');
+            badge.innerText = props.department;
+            badge.style.backgroundColor = getDeptColor(props.department, props.detail.includes("ด่วน"));
+
+            // Toggle deletion buttons depending on authorization toggle
+            const isAdmin = document.getElementById('adminToggle').checked;
+            const container = document.getElementById('adminDeleteBtnContainer');
+            if (isAdmin) {
+                container.classList.remove('hidden');
+            } else {
+                container.classList.add('hidden');
+            }
+
+            toggleEventDetailsModal(true);
+        }
+
+        // Modal Views Toggles
+        function toggleSettingsModal(show) {
+            const modal = document.getElementById('settingsModal');
+            if (show) modal.classList.remove('hidden');
+            else modal.classList.add('hidden');
+        }
+
+        function toggleEventDetailsModal(show) {
+            const modal = document.getElementById('eventDetailsModal');
+            if (show) modal.classList.remove('hidden');
+            else modal.classList.add('hidden');
+        }
+
+        function saveSettings() {
+            const keyVal = document.getElementById('setGeminiKey').value;
+            const passVal = document.getElementById('setAdminPass').value;
+            const configVal = document.getElementById('setFirebaseConfig').value;
+
+            localStorage.setItem('gemini_api_key', keyVal);
+            localStorage.setItem('admin_pass', passVal);
+            localStorage.setItem('firebase_config', configVal);
+
+            showNotification("บันทึกข้อมูลตั้งค่าเรียบร้อย! ระบบกำลังรีโหลดใหม่เพื่อทำงาน...", "success");
+            
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        }
+    </script>
 </body>
 </html>
