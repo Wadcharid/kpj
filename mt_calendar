@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ปฏิทินงานซ่อมบำรุง - มหาสวัสดิ์</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FullCalendar CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+    <style>
+        body { background-color: #f4f6f9; font-family: 'Sarabun', sans-serif; }
+        .card { box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: none; }
+        #calendar { max-width: 100%; height: 600px; background: white; padding: 20px; border-radius: 10px; }
+        .loading { display: none; color: #0d6efd; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container py-4">
+    <h2 class="text-center mb-4 text-primary">🗓️ ระบบกำหนดการงานซ่อมบำรุง (Mockup)</h2>
+    
+    <div class="row">
+        <!-- Sidebar: Upload & Form -->
+        <div class="col-md-4 mb-4">
+            <div class="card p-3">
+                <h5 class="card-title">1. อัปโหลดเอกสารขอซ่อม</h5>
+                <input class="form-control mb-2" type="file" id="fileInput" accept="image/*,.pdf">
+                <p class="loading mt-2" id="loadingText">⏳ AI กำลังสกัดข้อมูลจากหน้าแรก...</p>
+
+                <hr>
+
+                <h5 class="card-title">2. ตรวจสอบข้อมูล (AI Extract)</h5>
+                <form id="eventForm">
+                    <div class="mb-2">
+                        <label class="form-label text-muted small">วันที่ซ่อมบำรุง</label>
+                        <input type="date" class="form-control" id="evtDate" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label text-muted small">เวลา</label>
+                        <input type="time" class="form-control" id="evtTime" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label text-muted small">รายละเอียดงาน</label>
+                        <input type="text" class="form-control" id="evtDetail" placeholder="เช่น เปลี่ยนวาล์วท่อส่งน้ำ" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label text-muted small">สถานที่</label>
+                        <input type="text" class="form-control" id="evtLocation" placeholder="เช่น อาคารสูบน้ำแรงต่ำ" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">หน่วยงานต้นทาง</label>
+                        <input type="text" class="form-control" id="evtDept" placeholder="เช่น กองซ่อมบำรุง" required>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100" id="saveBtn" disabled>📌 บันทึกลงปฏิทิน</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Main: Calendar -->
+        <div class="col-md-8">
+            <div class="card p-3">
+                <h5 class="card-title">3. ปฏิทินกำหนดการ (รายเดือน)</h5>
+                <div id="calendar"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Calendar
+        var calendarEl = document.getElementById('calendar');
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            locale: 'th',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth'
+            },
+            events: [] // เริ่มต้นแบบปฏิทินว่างๆ
+        });
+        calendar.render();
+
+        // Elements
+        const fileInput = document.getElementById('fileInput');
+        const loadingText = document.getElementById('loadingText');
+        const eventForm = document.getElementById('eventForm');
+        const saveBtn = document.getElementById('saveBtn');
+
+        // Mockup AI Extraction
+        fileInput.addEventListener('change', function() {
+            if(this.files.length > 0) {
+                loadingText.style.display = 'block';
+                saveBtn.disabled = true;
+                eventForm.reset();
+
+                // จำลองเวลาให้ AI ทำงาน 2 วินาที แล้วเด้งข้อมูลจำลองขึ้นมา
+                setTimeout(() => {
+                    loadingText.style.display = 'none';
+                    
+                    // ข้อมูลจำลองที่สกัดได้
+                    const today = new Date().toISOString().split('T')[0];
+                    document.getElementById('evtDate').value = today;
+                    document.getElementById('evtTime').value = "09:30";
+                    document.getElementById('evtDetail').value = "ซ่อมบำรุงเครื่องสูบน้ำตะกอน (ต.1)";
+                    document.getElementById('evtLocation').value = "โรงตกตะกอน 1";
+                    document.getElementById('evtDept').value = "กซอ.";
+
+                    saveBtn.disabled = false;
+                }, 2000);
+            }
+        });
+
+        // Save to Calendar
+        eventForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const date = document.getElementById('evtDate').value;
+            const time = document.getElementById('evtTime').value;
+            const detail = document.getElementById('evtDetail').value;
+            const location = document.getElementById('evtLocation').value;
+            const dept = document.getElementById('evtDept').value;
+
+            // นำข้อมูลไปสร้าง Event ในปฏิทิน
+            calendar.addEvent({
+                title: `${time} - ${detail} (${location})`,
+                start: `${date}T${time}:00`,
+                extendedProps: {
+                    department: dept
+                },
+                backgroundColor: '#198754',
+                borderColor: '#198754'
+            });
+
+            // เคลียร์ฟอร์ม
+            eventForm.reset();
+            fileInput.value = '';
+            saveBtn.disabled = true;
+            alert('✅ บันทึกกำหนดการลงปฏิทินเรียบร้อยแล้ว');
+        });
+    });
+</script>
+
+</body>
+</html>
