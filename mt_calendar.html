@@ -669,7 +669,7 @@
 
         // Retries Gemini API with exponential backoff as per specs
         async function callGeminiWithRetry(base64Image, key, retries = 5, delay = 1000) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${key}`;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${key}`;
             
             const prompt = `คุณคือผู้ช่วยสกัดข้อมูลเอกสารบันทึกข้อความ ของโรงงานผลิตน้ำมหาสวัสดิ์ 
 วิเคราะห์รูปภาพเอกสารใบซ่อมแซมหรือใบขออนุมัตินี้ และสรุปข้อมูลออกมาเป็นวัตถุโครงสร้าง JSON ตามคุณสมบัติเหล่านี้อย่างแม่นยำ:
