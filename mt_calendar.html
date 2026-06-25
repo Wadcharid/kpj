@@ -145,7 +145,7 @@
                 <div id="aiLoader" class="hidden bg-mwaBlue-light/40 border border-mwaBlue/20 p-4 rounded-lg flex flex-col gap-3">
                     <div class="flex items-center gap-3">
                         <div class="w-5 h-5 border-2 border-mwaBlue border-t-transparent rounded-full animate-spin"></div>
-                        <span class="text-sm font-semibold text-mwaBlue-dark">Gemini 2.5 Flash กำลังประมวลผล...</span>
+                        <span class="text-sm font-semibold text-mwaBlue-dark">Gemini กำลังประมวลผล...</span>
                     </div>
                     <div class="text-xs text-slate-500 flex flex-col gap-1 pl-8 list-disc">
                         <div id="step-render" class="transition-opacity">● กำลังเตรียมสแกนรูปเอกสาร...</div>
@@ -461,39 +461,78 @@
             populateCalendar(events);
         }
 
+        // --- SMART DATE SANITIZER: ป้องกันบั๊กปี พ.ศ. (พ.ศ. - 543 = ค.ศ.) ---
+        function cleanDate(dateStr) {
+            if (!dateStr) return new Date().toISOString().split('T')[0];
+            
+            // เปลี่ยนอักษรขีดเฉียง / เป็นขีดกลาง - 
+            let sanitized = dateStr.replace(/\//g, '-');
+            let parts = sanitized.split('-');
+            
+            if (parts.length === 3) {
+                let year = parseInt(parts[0]);
+                let month = parts[1];
+                let day = parts[2];
+                
+                // กรณีดึงข้อมูลออกมาสลับรูปแบบเป็น DD-MM-YYYY
+                if (parseInt(parts[2]) > 2000) {
+                    year = parseInt(parts[2]);
+                    day = parts[0];
+                }
+                
+                // ตรวจสอบหากเจอปี พ.ศ. เกิน 2400 ให้ลบ 543 เพื่อทอนลงมาเป็นปี ค.ศ.
+                if (year > 2400) {
+                    year = year - 543;
+                }
+                
+                // เติมเลข 0 ปะหน้ากรณี หลักเดียว เช่น เดือน 6 เป็น 06
+                month = String(month).padStart(2, '0');
+                day = String(day).padStart(2, '0');
+                
+                return `${year}-${month}-${day}`;
+            }
+            
+            // กรณีข้อมูลเพี้ยน คืนค่าวันปัจจุบันเป็นเซฟตี้
+            return new Date().toISOString().split('T')[0];
+        }
+
         // Populate events from raw array to FullCalendar format
         function populateCalendar(eventsList) {
             if (!calendar) return;
 
-            // Remove existing
+            // เคลียร์ค่าเก่านิ่งๆ ไร้เงื่อนไขขัดแย้งของ EventSource
             calendar.removeAllEvents();
 
-            // Format to FullCalendar standard and add to calendar
-            const fcEvents = eventsList.map(evt => {
-                const isUrgent = evt.detail.includes("ด่วน");
-                return {
+            // ทยอยวาดข้อมูลทีละรายการโดยตรงผ่าน .addEvent()
+            eventsList.forEach(evt => {
+                const isUrgent = (evt.detail || '').includes("ด่วน");
+                
+                // ล้างทำความสะอาด Format วันที่ก่อนวาดลงไป (แก้บั๊ก พ.ศ. ลอยไปอนาคต)
+                const cleanedDate = cleanDate(evt.date);
+                const eventTime = evt.time || '08:30';
+
+                calendar.addEvent({
                     id: evt.id,
-                    title: `[${evt.department}] ${evt.detail}`,
-                    start: `${evt.date}T${evt.time}:00`,
+                    title: `[${evt.department || 'ไม่ระบุ'}] ${evt.detail || ''}`,
+                    start: `${cleanedDate}T${eventTime}:00`,
                     backgroundColor: getDeptColor(evt.department, isUrgent),
                     borderColor: getDeptColor(evt.department, isUrgent),
                     extendedProps: {
-                        department: evt.department,
-                        detail: evt.detail,
-                        location: evt.location,
-                        time: evt.time,
-                        date: evt.date
+                        department: evt.department || '',
+                        detail: evt.detail || '',
+                        location: evt.location || '',
+                        time: eventTime,
+                        date: cleanedDate
                     }
-                };
+                });
             });
 
-            calendar.addEventSource(fcEvents);
             document.getElementById('totalJobsCounter').innerText = `ทั้งหมด ${eventsList.length} รายการ`;
         }
 
         // Color coding by department
         function getDeptColor(dept, isUrgent = false) {
-            if (isUrgent) return '#dc2626'; // High-vis Red for urgent repairs
+            if (isUrgent) return '#dc2626'; // สีแดงสะดุดตาสำหรับงานด่วน
             const code = (dept || '').toUpperCase();
             if (code.includes('กซอ')) return '#2563eb'; // blue
             if (code.includes('กผจ')) return '#059669'; // emerald
@@ -610,7 +649,7 @@
             document.getElementById('aiLoader').classList.add('hidden');
         }
 
-        // Core AI processing function via Gemini 2.5 Flash API
+        // Core AI processing function via Gemini 3.5 Flash API
         async function analyzeDocumentWithAI(file) {
             const loader = document.getElementById('aiLoader');
             const stepRender = document.getElementById('step-render');
@@ -639,14 +678,15 @@
 
                 stepApi.classList.remove('opacity-40');
 
-                // Step 2: Make API Call to Gemini 2.5 Flash (with Exponential Backoff)
+                // Step 2: Make API Call to Gemini (with Exponential Backoff)
                 const responseText = await callGeminiWithRetry(base64Data, currentApiKey);
                 
                 // Step 3: Populate extracted data to verify form
                 const responseData = JSON.parse(responseText);
                 
                 if (responseData) {
-                    document.getElementById('formDate').value = responseData.date || '';
+                    // ทำความสะอาดและตรวจสอบปี พ.ศ. ทันทีเมื่อวิเคราะห์เสร็จเพื่อใส่ลง Form Date เปล่าๆ ให้ถูกสัดส่วน
+                    document.getElementById('formDate').value = cleanDate(responseData.date) || '';
                     document.getElementById('formTime').value = responseData.time || '';
                     document.getElementById('formDetail').value = responseData.detail || '';
                     document.getElementById('formLocation').value = responseData.location || '';
@@ -669,11 +709,12 @@
 
         // Retries Gemini API with exponential backoff as per specs
         async function callGeminiWithRetry(base64Image, key, retries = 5, delay = 1000) {
+            // รองรับทั้ง gemini-3.1-flash-lite และ flash-preview
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${key}`;
             
             const prompt = `คุณคือผู้ช่วยสกัดข้อมูลเอกสารบันทึกข้อความ ของโรงงานผลิตน้ำมหาสวัสดิ์ 
 วิเคราะห์รูปภาพเอกสารใบซ่อมแซมหรือใบขออนุมัตินี้ และสรุปข้อมูลออกมาเป็นวัตถุโครงสร้าง JSON ตามคุณสมบัติเหล่านี้อย่างแม่นยำ:
-1. "date" (ค่าข้อความรูป YYYY-MM-DD หากไม่มีปีให้ใช้ปีปัจจุบัน 2026)
+1. "date" (ค่าข้อความรูป YYYY-MM-DD หากเป็นปี พ.ศ. ให้คืนปี พ.ศ. นั้นมาเลย)
 2. "time" (เวลาเริ่มต้นซ่อมบำรุงในเอกสาร รูป HH:MM หากไม่ระบุใช้ "08:30")
 3. "detail" (สรุปชื่องานซ่อมสั้นๆ ให้กระชับความกว้างไม่เกิน 50 ตัวอักษร)
 4. "location" (สถานที่ติดตั้งอุปกรณ์ซ่อมในโรงงาน)
@@ -738,8 +779,11 @@
         async function saveSchedule(event) {
             event.preventDefault();
 
+            // ทำความสะอาดวันที่ฟอร์มให้เป็น ค.ศ. แสนสวยงามก่อนเซฟลงระบบ
+            const cleanedDate = cleanDate(document.getElementById('formDate').value);
+
             const payload = {
-                date: document.getElementById('formDate').value,
+                date: cleanedDate,
                 time: document.getElementById('formTime').value,
                 detail: document.getElementById('formDetail').value,
                 location: document.getElementById('formLocation').value,
