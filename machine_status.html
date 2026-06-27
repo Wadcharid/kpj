@@ -132,6 +132,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
         .building-title { 
             background: var(--title-bg); font-size: 11px; padding: 3px 8px; margin-bottom: 4px; 
             border-radius: 2px; font-weight: bold; color: var(--text-dark); text-align: center; width: 100%;
+            white-space: pre-line; /* คำสั่งนี้จะเปลี่ยน \n ให้กลายเป็นบรรทัดใหม่จริงๆ */
+            text-align: center;    /* จัดข้อความให้อยู่ตรงกลาง */
+            line-height: 1.2;      /* ปรับระยะห่างระหว่างบรรทัดให้สวยงาม */
         }
         .building-box {
             background: var(--box-blue); border: 2px solid var(--box-border); padding: 6px;
