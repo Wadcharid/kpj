@@ -132,6 +132,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
         .building-title { 
             background: var(--title-bg); font-size: 11px; padding: 3px 8px; margin-bottom: 4px; 
             border-radius: 2px; font-weight: bold; color: var(--text-dark); text-align: center; width: 100%;
+            white-space: pre-line; /* คำสั่งนี้จะเปลี่ยน \n ให้กลายเป็นบรรทัดใหม่จริงๆ */
+            text-align: center;    /* จัดข้อความให้อยู่ตรงกลาง */
+            line-height: 1.2;      /* ปรับระยะห่างระหว่างบรรทัดให้สวยงาม */
 
         }
         .building-box {
@@ -308,7 +311,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
         { id: 'b_pac', title: 'PAC 3-4', left: '210px', top: '400px', layout: 'row' , width: '120px' },
         { id: 'b_poly2', title: 'Polymer 3-4', left: '350px', top: '320px', layout: 'col' },
         { id: 'b_boost2', title: 'BST. PRE-CL2\n3-4', left: '350px', top: '450px',layout: 'row', width: '100px'  },  
-        { id: 'b_boost_post', title: 'BST. POST-CL2\n3-4', left: '1130px', top: '670px', layout: 'col' }
+        { id: 'b_boost_post', title: 'BST. POST-CL2\n3-4', left: '1130px', top: '670px', layout: 'col' },
         
         // กลุ่ม 4 (ถังตกตะกอน 1-2)
         { id: 'b_cfs1b', title: 'CFS1B', left: '470px', top: '50px', layout: 'col' },
@@ -342,7 +345,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
         // Column 7 (ขยับแกนซ้ายไปที่ 1130px เพื่อหลบ BACKWASH 2)
         { id: 'b_dps', title: 'DPS.', left: '1130px', top: '210px', layout: 'col' },
         { id: 'b_tps', title: 'TPS.', left: '1130px', top: '380px', layout: 'col' },
-        { id: 'b_service', title: 'SERVICE', left: '1130px', top: '540px', layout: 'col' },
+        { id: 'b_service', title: 'SERVICE', left: '1130px', top: '540px', layout: 'col' }
 
     ];
 
