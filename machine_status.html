@@ -1,0 +1,630 @@
+<!-- 
+=========================================================
+ส่วนนี้คือ PHP Backend สำหรับใช้งานจริงบน XAMPP 
+(เมื่อจะรันจริงบน XAMPP ให้เปิด Comment ออก และเปลี่ยนชื่อไฟล์เป็น index.php)
+=========================================================
+<?php
+// ตั้งค่าไฟล์ JSON
+$json_file = 'machine_status.json';
+
+// ตรวจสอบการบันทึกข้อมูล (รับค่าจาก AJAX)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['action'] == 'save') {
+    $data = json_decode(file_get_contents('php://input'), true);
+    file_put_contents($json_file, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    echo json_encode(["status" => "success"]);
+    exit;
+}
+
+// ตรวจสอบการโหลดข้อมูล
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['action'] == 'load') {
+    header('Content-Type: application/json');
+    if (file_exists($json_file)) {
+        echo file_get_contents($json_file);
+    } else {
+        echo "{}";
+    }
+    exit;
+}
+?>
+========================================================= 
+-->
+
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Machine Status Dashboard</title>
+    <style>
+        /* ================= CSS VARIABLES & RESET ================= */
+        :root {
+            --bg-color: #f4f7fa;
+            --box-blue: #4a7bc7; /* สีพื้นหลังกล่องเครื่องจักร */
+            --box-border: #2b4f8a;
+            --title-bg: #d6e0f0;
+            --color-ready: #39FF14; /* สีเขียว */
+            --color-out: #ff0000;   /* สีแดง */
+            --text-dark: #333;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #222; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; }
+
+        /* ================= 16:9 CONTAINER ================= */
+        .dashboard-wrapper {
+            width: 100%;
+            max-width: 1920px;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            min-height: 100vh;
+        }
+
+        /* ================= HEADER ================= */
+        .top-bar {
+            background: #1a2a40;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+            z-index: 10;
+        }
+        .top-bar h2 { font-size: 1.2rem; margin: 0; }
+        .login-btn { background: #4a7bc7; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .login-btn:hover { background: #355d9c; }
+
+        /* ================= MAIN LAYOUT (LEFT MAP / RIGHT SIDEBAR) ================= */
+        .main-content {
+            display: flex;
+            flex: 1;
+            flex-direction: row;
+        }
+        
+        /* -- ฝั่งซ้าย (Map) -- */
+        .map-area {
+            flex: 3;
+            position: relative;
+            background: var(--bg-color);
+            border-right: 2px solid #ccc;
+            overflow: hidden; /* ป้องกันไม่ให้ล้นตอนซูม */
+            display: flex;
+            align-items: flex-start;
+        }
+
+        /* -- กล่องจำลองขนาด 1300x880 (ใช้จัดการย่อ-ขยายสัดส่วน) -- */
+        #mapContainer {
+            width: 1300px;
+            height: 880px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: top left; /* ให้ซูมจากมุมซ้ายบน */
+        }
+
+        /* -- ฝั่งขวา (Alert Cards) -- */
+        .alert-sidebar {
+            flex: 1;
+            min-width: 320px;
+            max-width: 450px;
+            background: #fff;
+            padding: 15px;
+            overflow-y: auto;
+            max-height: calc(100vh - 60px);
+        }
+        .alert-sidebar h3 {
+            color: var(--color-out);
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ================= MAP ELEMENTS ================= */
+        .legend-box { position: absolute; top: 15px; right: 20px; background: var(--title-bg); padding: 10px 15px; border-radius: 5px; font-size: 13px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 5;}
+        .legend-item { display: inline-flex; align-items: center; gap: 5px; margin-right: 15px; font-weight: bold; }
+        
+        .building-container { position: absolute; display: flex; flex-direction: column; align-items: center; }
+        .building-title { 
+            background: var(--title-bg); font-size: 11px; padding: 3px 8px; margin-bottom: 4px; 
+            border-radius: 2px; font-weight: bold; color: var(--text-dark); text-align: center; width: 100%;
+        }
+        .building-box {
+            background: var(--box-blue); border: 2px solid var(--box-border); padding: 6px;
+            display: flex; gap: 4px; border-radius: 2px;
+        }
+        
+        /* รูปแบบการจัดเรียงในกล่องอาคาร */
+        .layout-col { flex-direction: column; }
+        .layout-row { flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: center;}
+        .layout-circle { 
+            border-radius: 50%; padding: 15px; 
+            width: 90px; height: 90px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; 
+        }
+
+        /* สัญลักษณ์เครื่องจักร (Machine Item) */
+        .machine-item {
+            display: flex; align-items: center; gap: 6px; font-size: 11px; color: white; font-weight: bold;
+        }
+        .machine-item.circle-text { flex-direction: column; font-size: 10px; gap: 2px;}
+        
+        .status-dot {
+            width: 14px; height: 14px; border: 1.5px solid #000; border-radius: 2px;
+            background: var(--color-ready); /* Default */
+        }
+        .status-dot.out { background: var(--color-out); }
+
+        /* ร่องน้ำ (Trash Rack visual) */
+        .water-path { 
+            position: absolute; background: #6b93d6; border-radius: 20px; width: 35px; 
+            display: flex; flex-direction: column; align-items: center; justify-content: space-around; 
+            padding: 20px 0; font-size: 11px; font-weight: bold; text-align: center; color: #fff;
+        }
+        .water-path::before { content: '↑'; font-size: 26px; color: rgba(255,255,255,0.7); }
+
+        /* ================= CARDS (RIGHT SIDEBAR) ================= */
+        .alert-card {
+            background: white; border-left: 5px solid var(--color-out);
+            padding: 12px; margin-bottom: 12px; border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-size: 13px;
+        }
+        .alert-card h4 { margin: 0 0 5px 0; color: var(--text-dark); font-size: 14px; display: flex; align-items: center; gap: 5px;}
+        .alert-card p { margin: 4px 0; color: #555; }
+        .alert-card strong { color: #333; }
+
+        /* ================= MODAL & EDIT FORM ================= */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6);
+            display: none; justify-content: center; align-items: center; z-index: 1000;
+        }
+        .modal-content {
+            background: white; padding: 20px; border-radius: 8px; width: 400px; max-width: 90%;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3); text-align: center;
+        }
+        .modal-content input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; }
+        
+        .admin-panel {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f4f6f9;
+            display: none; flex-direction: column; z-index: 999;
+        }
+        .admin-header { background: #1a2a40; color: white; padding: 15px 20px; display: flex; justify-content: space-between; }
+        .admin-body { padding: 20px; overflow-y: auto; flex: 1; }
+        
+        table.edit-table { width: 100%; border-collapse: collapse; background: white; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        table.edit-table th, table.edit-table td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 13px; }
+        table.edit-table th { background: #d6e0f0; }
+        table.edit-table select, table.edit-table input { width: 100%; padding: 5px; border: 1px solid #ccc; }
+        
+        .btn { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-primary { background: #007bff; color: white; width: 100%; margin-top: 10px;}
+
+        /* ย่อ layout อัตโนมัติเมื่ออยู่จอมือถือ */
+        @media (max-width: 900px) {
+            .main-content { flex-direction: column; }
+            .alert-sidebar { max-width: 100%; border-top: 2px solid #ccc; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-wrapper">
+    <!-- Header -->
+    <header class="top-bar">
+        <h2>🏭 ระบบตรวจสอบสถานะเครื่องจักร โรงงานผลิตน้ำมหาสวัสดิ์</h2>
+        <button class="login-btn" onclick="openLoginModal()">🔒 Admin</button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- ฝั่งซ้าย: แผนผังอาคาร (Canvas) -->
+        <div class="map-area" id="mapArea">
+            <div id="mapContainer">
+                
+                <!-- Legend -->
+                <div class="legend-box">
+                    <div style="margin-bottom:8px;"><strong>ข้อมูลสถานะเครื่องจักร</strong><br><small>โดย กผจ. ฝผม.</small></div>
+                    <div>
+                        <span class="legend-item"><div class="status-dot"></div> Ready</span>
+                        <span class="legend-item"><div class="status-dot out"></div> Out of service</span>
+                    </div>
+                </div>
+
+                <!-- Water Paths -->
+                <div class="water-path" style="left: 30px; top: 60px; height: 280px;">TRASH<br>RACK 1</div>
+                <div class="water-path" style="left: 30px; top: 480px; height: 280px;">TRASH<br>RACK 2</div>
+
+                <!-- Buildings will be generated here by JS -->
+            </div>
+        </div>
+
+        <!-- ฝั่งขวา: แจ้งเตือน -->
+        <aside class="alert-sidebar" id="alertSidebar">
+            <h3>🚨 แจ้งเตือน Out of Service</h3>
+            <div id="alertCardsContainer">
+                <!-- Cards will be generated here -->
+            </div>
+        </aside>
+    </main>
+</div>
+
+<!-- ================= MODALS ================= -->
+<!-- Login Modal -->
+<div class="modal-overlay" id="loginModal">
+    <div class="modal-content">
+        <h3>เข้าสู่ระบบ (Admin)</h3>
+        <p style="font-size:12px; color:#666;">(User: operator / Pass: operator)</p>
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <button class="btn btn-primary" onclick="login()">เข้าสู่ระบบ</button>
+        <button class="btn" style="margin-top:10px; width:100%;" onclick="closeLoginModal()">ยกเลิก</button>
+    </div>
+</div>
+
+<!-- Admin Panel (Edit Form) -->
+<div class="admin-panel" id="adminPanel">
+    <div class="admin-header">
+        <h2>📝 จัดการสถานะเครื่องจักร</h2>
+        <div>
+            <button class="btn btn-success" onclick="saveData()">💾 บันทึกข้อมูล</button>
+            <button class="btn btn-danger" onclick="closeAdmin()">✖ ปิด</button>
+        </div>
+    </div>
+    <div class="admin-body" id="adminFormContainer">
+        <!-- Forms will be generated here -->
+    </div>
+</div>
+
+<script>
+    /* ==========================================
+       1. โครงสร้างอาคาร (Layout Config - พิกัดเป๊ะๆ ตาม Canvas 1300x880)
+    ========================================== */
+    const buildingsConfig = [
+        // Column 1
+        { id: 'b_raw1', title: 'RAW WATER 1', left: '100px', top: '50px', layout: 'col' },
+        { id: 'b_raw2', title: 'RAW WATER 2', left: '100px', top: '480px', layout: 'col' },
+        
+        // Column 2
+        { id: 'b_alum12', title: 'ALUM 1-2', left: '230px', top: '50px', layout: 'col' },
+        { id: 'b_pac12', title: 'PAC 1-2', left: '230px', top: '200px', layout: 'col' },
+        { id: 'b_alum3', title: 'ALUM 3', left: '230px', top: '480px', layout: 'col' },
+        { id: 'b_alum4', title: 'ALUM 4', left: '230px', top: '610px', layout: 'col' },
+        { id: 'b_pac', title: 'PAC', left: '230px', top: '740px', layout: 'col' },
+
+        // Column 3
+        { id: 'b_evap1', title: 'EVAP', left: '310px', top: '50px', layout: 'col' },
+        { id: 'b_chlo1', title: 'CHLO.', left: '310px', top: '200px', layout: 'col' },
+        { id: 'b_evap2', title: 'EVAP.', left: '310px', top: '480px', layout: 'col' },
+        { id: 'b_chlo2', title: 'CHLO.', left: '310px', top: '670px', layout: 'col' },
+
+        // Column 4 (เปลี่ยนจาก CAUSTIC SODA เป็น Polymer)
+        { id: 'b_poly1', title: 'Polymer 1-2', left: '390px', top: '50px', layout: 'col' },
+        { id: 'b_boost1', title: 'BOOSTER', left: '390px', top: '200px', layout: 'col' },
+        { id: 'b_poly2', title: 'Polymer 3-4', left: '390px', top: '480px', layout: 'col' },
+        { id: 'b_boost2', title: 'BOOSTER PRE-CL2', left: '390px', top: '670px', layout: 'col' },
+
+        // Column 5 (Middle)
+        { id: 'b_cfs1b', title: 'CFS1B', left: '500px', top: '50px', layout: 'col' },
+        { id: 'b_cfs1a', title: 'CFS1A', left: '580px', top: '50px', layout: 'col' },
+        { id: 'b_sludge1', title: 'SLUDGE 1', left: '500px', top: '150px', layout: 'row', width: '70px' },
+        { id: 'b_sludge2', title: 'SLUDGE 2', left: '580px', top: '150px', layout: 'row', width: '70px' },
+
+        { id: 'b_cfs3a', title: 'CFS3A', left: '490px', top: '480px', layout: 'circle' },
+        { id: 'b_cfs3b', title: 'CFS3B', left: '590px', top: '480px', layout: 'circle' },
+        { id: 'b_sludge3', title: 'SLUDGE 3', left: '550px', top: '600px', layout: 'row', width: '70px' },
+        
+        { id: 'b_cfs4a', title: 'CFS4A', left: '490px', top: '680px', layout: 'circle' },
+        { id: 'b_cfs4b', title: 'CFS4B', left: '590px', top: '680px', layout: 'circle' },
+        { id: 'b_sludge4', title: 'SLUDGE 4', left: '550px', top: '800px', layout: 'row', width: '70px' },
+
+        // Column 6 (Filters)
+        { id: 'b_filter1', title: 'FILTER PH. 1', left: '710px', top: '50px', layout: 'row', width: '230px' },
+        { id: 'b_filter2', title: 'FILTER PH. 2', left: '710px', top: '130px', layout: 'row', width: '230px' },
+        { id: 'b_bw1', title: 'BACKWASH 1', left: '710px', top: '210px', layout: 'row', width: '180px' },
+        { id: 'b_wws1', title: 'WWS 1', left: '900px', top: '210px', layout: 'row', width: '90px' },
+
+        { id: 'b_filter3', title: 'FILTER PH. 3', left: '710px', top: '480px', layout: 'row', width: '200px' },
+        { id: 'b_wws3', title: 'WWS 3', left: '920px', top: '480px', layout: 'row', width: '90px' },
+        { id: 'b_bw2', title: 'BACKWASH 2', left: '920px', top: '560px', layout: 'row', width: '180px' },
+        
+        { id: 'b_filter4', title: 'FILTER PH. 4', left: '710px', top: '660px', layout: 'row', width: '200px' },
+        { id: 'b_wws4', title: 'WWS 4', left: '920px', top: '660px', layout: 'row', width: '90px' },
+
+        // Column 7
+        { id: 'b_dps', title: 'DPS.', left: '1080px', top: '200px', layout: 'col' },
+        { id: 'b_tps', title: 'TPS.', left: '1080px', top: '480px', layout: 'col' },
+        { id: 'b_service', title: 'SERVICE', left: '1080px', top: '610px', layout: 'col' },
+        { id: 'b_boost_post', title: 'BOOSTER POST-CL2', left: '1080px', top: '740px', layout: 'col' }
+    ];
+
+    /* ==========================================
+       2. ข้อมูลเครื่องจักรและตำแหน่ง (จัดเรียงตามรูปต้นฉบับเป๊ะ)
+    ========================================== */
+    const machinesMap = [
+        // RAW WATER
+        { id: 'RPS1.1P01A', label: '1P01A', b: 'b_raw1' }, { id: 'RPS1.1P02A', label: '1P02A', b: 'b_raw1' },
+        { id: 'RPS1.1P01B', label: '1P01B', b: 'b_raw1' }, { id: 'RPS1.1P02B', label: '1P02B', b: 'b_raw1' }, { id: 'RPS1.1P01C', label: '1P01C', b: 'b_raw1' },
+        { id: 'RPS2.PUMP_NO1', label: '3_1P01A', b: 'b_raw2' }, { id: 'RPS2.PUMP_NO2', label: '3_1P01B', b: 'b_raw2' },
+        { id: 'RPS2.PUMP_NO3', label: '3_1P01C', b: 'b_raw2' }, { id: 'RPS2.PUMP_NO4', label: '4_1P01D', b: 'b_raw2' }, { id: 'RPS2.PUMP_NO5', label: '4_1P01E', b: 'b_raw2' },
+        
+        // CHEM 1-2
+        { id: 'CHEM1.ALUM_A', label: 'A', b: 'b_alum12' }, { id: 'CHEM1.ALUM_B', label: 'B', b: 'b_alum12' }, { id: 'CHEM1.ALUM_C', label: 'C', b: 'b_alum12' },
+        { id: 'CHEM1.PAC_NO1', label: '1', b: 'b_pac12' }, { id: 'CHEM1.PAC_NO2', label: '2', b: 'b_pac12' }, { id: 'CHEM1.PAC_NO3', label: '3', b: 'b_pac12' },
+        { id: 'CHEM1.EVAP_A', label: 'A', b: 'b_evap1' }, { id: 'CHEM1.EVAP_B', label: 'B', b: 'b_evap1' }, { id: 'CHEM1.EVAP_C', label: 'C', b: 'b_evap1' }, { id: 'CHEM1.EVAP_D', label: 'D', b: 'b_evap1' },
+        { id: 'CHEM1.CHLO_1A', label: '1A', b: 'b_chlo1' }, { id: 'CHEM1.CHLO_1B', label: '1B', b: 'b_chlo1' }, { id: 'CHEM1.CHLO_1C', label: '1C', b: 'b_chlo1' }, { id: 'CHEM1.CHLO_2A', label: '2A', b: 'b_chlo1' }, { id: 'CHEM1.CHLO_2B', label: '2B', b: 'b_chlo1' },
+        
+        // CHEM 3-4
+        { id: 'CHEM2.ALUM_NO1', label: '1', b: 'b_alum3' }, { id: 'CHEM2.ALUM_NO2', label: '2', b: 'b_alum3' }, { id: 'CHEM2.ALUM_NO3', label: '3', b: 'b_alum3' },
+        { id: 'CHEM2.ALUM_NO4', label: '4', b: 'b_alum4' }, { id: 'CHEM2.ALUM_NO5', label: '5', b: 'b_alum4' }, { id: 'CHEM2.ALUM_NO6', label: '6', b: 'b_alum4' },
+        { id: 'CHEM2.PAC_NO1', label: '1', b: 'b_pac' }, { id: 'CHEM2.PAC_NO2', label: '2', b: 'b_pac' }, { id: 'CHEM2.PAC_NO3', label: '3', b: 'b_pac' },
+        { id: 'CHEM2.EVAP_1', label: '1', b: 'b_evap2' }, { id: 'CHEM2.EVAP_2', label: '2', b: 'b_evap2' }, { id: 'CHEM2.EVAP_3', label: '3', b: 'b_evap2' }, { id: 'CHEM2.EVAP_4', label: '4', b: 'b_evap2' }, { id: 'CHEM2.EVAP_5', label: '5', b: 'b_evap2' },
+        { id: 'CHEM2.CHLO_1', label: '1', b: 'b_chlo2' }, { id: 'CHEM2.CHLO_2', label: '2', b: 'b_chlo2' }, { id: 'CHEM2.CHLO_3', label: '3', b: 'b_chlo2' }, { id: 'CHEM2.CHLO_4', label: '4', b: 'b_chlo2' }, { id: 'CHEM2.CHLO_5', label: '5', b: 'b_chlo2' },
+        
+        // SODA / POLYMER & BOOSTER
+        { id: 'POLYMER1.1', label: '1', b: 'b_poly1' }, { id: 'POLYMER1.2', label: '2', b: 'b_poly1' }, { id: 'POLYMER1.3', label: '3', b: 'b_poly1' },
+        { id: 'CHEM1.MOTP_1A', label: '1A', b: 'b_boost1' }, { id: 'CHEM1.MOTP_1B', label: '1B', b: 'b_boost1' }, { id: 'CHEM1.MOTP_1C', label: '1C', b: 'b_boost1' }, { id: 'CHEM1.MOTP_2A', label: '2A', b: 'b_boost1' }, { id: 'CHEM1.MOTP_2B', label: '2B', b: 'b_boost1' },
+        { id: 'POLYMER2.1', label: '1', b: 'b_poly2' }, { id: 'POLYMER2.2', label: '2', b: 'b_poly2' }, { id: 'POLYMER2.3', label: '3', b: 'b_poly2' },
+        { id: 'CHEM2.P_PRE_3A', label: '1', b: 'b_boost2' }, { id: 'CHEM2.P_PRE_4A', label: '2', b: 'b_boost2' },
+
+        // CFS
+        { id: 'CFS1B.FAN_B', label: 'NO.B', b: 'b_cfs1b' }, { id: 'CFS1B.FAN_D', label: 'NO.D', b: 'b_cfs1b' },
+        { id: 'CFS1A.FAN_A', label: 'NO.A', b: 'b_cfs1a' }, { id: 'CFS1A.FAN_C', label: 'NO.C', b: 'b_cfs1a' },
+        { id: 'SLUDGE_PUMP_1', label: '1', b: 'b_sludge1' }, { id: 'SLUDGE_PUMP_2', label: '2', b: 'b_sludge1' }, { id: 'SLUDGE_PUMP_3', label: '3', b: 'b_sludge1' },
+        { id: 'SLUDGE_PUMP_4', label: '1', b: 'b_sludge2' }, { id: 'SLUDGE_PUMP_5', label: '2', b: 'b_sludge2' }, { id: 'SLUDGE_PUMP_6', label: '3', b: 'b_sludge2' },
+        
+        { id: 'CFS3A_TURBINE', label: 'TURBINE', b: 'b_cfs3a' }, { id: 'CFS3A_SCRAPER', label: 'SCRAPPER', b: 'b_cfs3a' },
+        { id: 'CFS3B_TURBINE', label: 'TURBINE', b: 'b_cfs3b' }, { id: 'CFS3B_SCRAPER', label: 'SCRAPPER', b: 'b_cfs3b' },
+        { id: 'SLUDGE3_PUMP_1', label: '1', b: 'b_sludge3' }, { id: 'SLUDGE3_PUMP_2', label: '2', b: 'b_sludge3' }, { id: 'SLUDGE3_PUMP_3', label: '3', b: 'b_sludge3' },
+        
+        { id: 'CFS4A_TURBINE', label: 'TURBINE', b: 'b_cfs4a' }, { id: 'CFS4A_SCRAPER', label: 'SCRAPPER', b: 'b_cfs4a' },
+        { id: 'CFS4B_TURBINE', label: 'TURBINE', b: 'b_cfs4b' }, { id: 'CFS4B_SCRAPER', label: 'SCRAPPER', b: 'b_cfs4b' },
+        { id: 'SLUDGE4_PUMP_1', label: '1', b: 'b_sludge4' }, { id: 'SLUDGE4_PUMP_2', label: '2', b: 'b_sludge4' }, { id: 'SLUDGE4_PUMP_3', label: '3', b: 'b_sludge4' },
+        
+        // FILTERS & BACKWASH
+        { id: 'FILTER1_NO1', label: '1', b: 'b_filter1' }, { id: 'FILTER1_NO2', label: '2', b: 'b_filter1' }, { id: 'FILTER1_NO3', label: '3', b: 'b_filter1' }, { id: 'FILTER1_NO4', label: '4', b: 'b_filter1' }, { id: 'FILTER1_NO5', label: '5', b: 'b_filter1' }, { id: 'FILTER1_NO6', label: '6', b: 'b_filter1' }, { id: 'FILTER1_NO7', label: '7', b: 'b_filter1' }, { id: 'FILTER1_NO8', label: '8', b: 'b_filter1' },
+        { id: 'FILTER2_NO9', label: '9', b: 'b_filter2' }, { id: 'FILTER2_NO10', label: '10', b: 'b_filter2' }, { id: 'FILTER2_NO11', label: '11', b: 'b_filter2' }, { id: 'FILTER2_NO12', label: '12', b: 'b_filter2' }, { id: 'FILTER2_NO13', label: '13', b: 'b_filter2' }, { id: 'FILTER2_NO14', label: '14', b: 'b_filter2' }, { id: 'FILTER2_NO15', label: '15', b: 'b_filter2' }, { id: 'FILTER2_NO16', label: '16', b: 'b_filter2' },
+        
+        { id: 'FTS12.AIR_1', label: 'B.1', b: 'b_bw1' }, { id: 'FTS12.AIR_2', label: 'B.2', b: 'b_bw1' }, { id: 'FTS12.AIR_3', label: 'B.3', b: 'b_bw1' }, { id: 'FTS12.BACKWASH_P1', label: 'P.1', b: 'b_bw1' }, { id: 'FTS12.BACKWASH_P2', label: 'P.2', b: 'b_bw1' }, { id: 'FTS12.BACKWASH_P3', label: 'P.3', b: 'b_bw1' },
+        { id: 'FTS12.RECOVERY_P1', label: 'P.1', b: 'b_wws1' }, { id: 'FTS12.RECOVERY_P2', label: 'P.2', b: 'b_wws1' }, { id: 'FTS12.RECOVERY_P3', label: 'P.3', b: 'b_wws1' },
+
+        // Filter 3 (จัดเรียง แถวบนคู่ แถวล่างคี่)
+        { id: 'FILTER3_NO2', label: '2', b: 'b_filter3' }, { id: 'FILTER3_NO4', label: '4', b: 'b_filter3' }, { id: 'FILTER3_NO6', label: '6', b: 'b_filter3' }, { id: 'FILTER3_NO8', label: '8', b: 'b_filter3' }, { id: 'FILTER3_NO10', label: '10', b: 'b_filter3' }, { id: 'FILTER3_NO12', label: '12', b: 'b_filter3' }, { id: 'FILTER3_NO14', label: '14', b: 'b_filter3' },
+        { id: 'FILTER3_NO1', label: '1', b: 'b_filter3' }, { id: 'FILTER3_NO3', label: '3', b: 'b_filter3' }, { id: 'FILTER3_NO5', label: '5', b: 'b_filter3' }, { id: 'FILTER3_NO7', label: '7', b: 'b_filter3' }, { id: 'FILTER3_NO9', label: '9', b: 'b_filter3' }, { id: 'FILTER3_NO11', label: '11', b: 'b_filter3' }, { id: 'FILTER3_NO13', label: '13', b: 'b_filter3' },
+        
+        { id: 'FTS3.RECOVERY_P1', label: 'P.1', b: 'b_wws3' }, { id: 'FTS3.RECOVERY_P2', label: 'P.2', b: 'b_wws3' }, { id: 'FTS3.RECOVERY_P3', label: 'P.3', b: 'b_wws3' },
+        
+        // Filter 4 (จัดเรียง แถวบนคู่ แถวล่างคี่)
+        { id: 'FILTER4_NO2', label: '2', b: 'b_filter4' }, { id: 'FILTER4_NO4', label: '4', b: 'b_filter4' }, { id: 'FILTER4_NO6', label: '6', b: 'b_filter4' }, { id: 'FILTER4_NO8', label: '8', b: 'b_filter4' }, { id: 'FILTER4_NO10', label: '10', b: 'b_filter4' }, { id: 'FILTER4_NO12', label: '12', b: 'b_filter4' }, { id: 'FILTER4_NO14', label: '14', b: 'b_filter4' },
+        { id: 'FILTER4_NO1', label: '1', b: 'b_filter4' }, { id: 'FILTER4_NO3', label: '3', b: 'b_filter4' }, { id: 'FILTER4_NO5', label: '5', b: 'b_filter4' }, { id: 'FILTER4_NO7', label: '7', b: 'b_filter4' }, { id: 'FILTER4_NO9', label: '9', b: 'b_filter4' }, { id: 'FILTER4_NO11', label: '11', b: 'b_filter4' }, { id: 'FILTER4_NO13', label: '13', b: 'b_filter4' },
+        
+        { id: 'FTS34.AIR_1', label: 'B.1', b: 'b_bw2' }, { id: 'FTS34.AIR_2', label: 'B.2', b: 'b_bw2' }, { id: 'FTS34.AIR_3', label: 'B.3', b: 'b_bw2' }, { id: 'FTS34.BACKWASH_P1', label: 'P.1', b: 'b_bw2' }, { id: 'FTS34.BACKWASH_P2', label: 'P.2', b: 'b_bw2' }, { id: 'FTS34.BACKWASH_P3', label: 'P.3', b: 'b_bw2' },
+        { id: 'FTS4.RECOVERY_P1', label: 'P.1', b: 'b_wws4' }, { id: 'FTS4.RECOVERY_P2', label: 'P.2', b: 'b_wws4' }, { id: 'FTS4.RECOVERY_P3', label: 'P.3', b: 'b_wws4' },
+
+        // DPS, TPS, SERVICE
+        { id: 'DPS.7P01A', label: '7P01A', b: 'b_dps' }, { id: 'DPS.7P01B', label: '7P01B', b: 'b_dps' }, { id: 'DPS.7P02A', label: '7P02A', b: 'b_dps' }, { id: 'DPS.7P02B', label: '7P02B', b: 'b_dps' },
+        { id: 'TPS1.PUMP_NO1', label: 'TR NO.1', b: 'b_tps' }, { id: 'TPS1.PUMP_NO2', label: 'TR NO.2', b: 'b_tps' }, { id: 'TPS1.PUMP_NO3', label: 'TR NO.3', b: 'b_tps' }, { id: 'TPS1.PUMP_NO4', label: 'TR NO.4', b: 'b_tps' },
+        { id: 'SERVICE.PUMP_NO1', label: '1', b: 'b_service' }, { id: 'SERVICE.PUMP_NO2', label: '2', b: 'b_service' }, { id: 'SERVICE.PUMP_NO3', label: '3', b: 'b_service' },
+        { id: 'CHEM2.MOTP_3A', label: '3A', b: 'b_boost_post' }, { id: 'CHEM2.MOTP_3B', label: '3B', b: 'b_boost_post' }, { id: 'CHEM2.MOTP_4A', label: '4A', b: 'b_boost_post' }, { id: 'CHEM2.MOTP_4B', label: '4B', b: 'b_boost_post' }
+    ];
+
+    /* ==========================================
+       3. Scale & Resize Logic (แก้ปัญหาแผนผังเละ)
+    ========================================== */
+    function scaleMap() {
+        const mapArea = document.getElementById('mapArea');
+        const mapContainer = document.getElementById('mapContainer');
+        if(!mapArea || !mapContainer) return;
+        
+        // ขนาดตั้งต้นของ Canvas
+        const targetWidth = 1300; 
+        const targetHeight = 900;
+        
+        // คำนวณอัตราส่วนการย่อ-ขยาย ตามความกว้างของ mapArea ณ ตอนนั้น
+        const scale = mapArea.clientWidth / targetWidth;
+        
+        // สั่ง Scale ตัวกล่อง
+        mapContainer.style.transform = `scale(${scale})`;
+        
+        // ปรับความสูงของ mapArea ให้พอดีกับกล่องที่ถูก scale ไปแล้ว
+        mapArea.style.minHeight = (targetHeight * scale) + 'px';
+    }
+
+    // สั่งคำนวณตอนโหลดหน้าเสร็จ และตอนดึงหน้าต่าง (Resize)
+    window.addEventListener('load', scaleMap);
+    window.addEventListener('resize', scaleMap);
+
+
+    /* ==========================================
+       4. Data State (จำลองข้อมูลจาก JSON)
+    ========================================== */
+    let machineData = {}; 
+
+    init();
+
+    async function init() {
+        // [สำหรับรันจริง PHP]
+        // try {
+        //     let res = await fetch('?action=load');
+        //     machineData = await res.json();
+        // } catch(e) { console.error(e); }
+
+        // [สำหรับ Preview] สร้าง Mockup Data
+        machineData = {
+            "RPS1.1P01C": { status: "OUT OF SERVICE", detail: "Overhaul ซ่อมบำรุงประจำปี", repair_no: "RP-001" },
+            "CHEM1.PAC_NO1": { status: "OUT OF SERVICE", detail: "Servo ไม่รับสัญญาณ ปรับ Flow ไม่ได้", repair_no: "RP-002" },
+            "CHEM2.EVAP_3": { status: "OUT OF SERVICE", detail: "อ่าน Pressure = -5.1 bar", repair_no: "MH26-0012654" },
+            "SERVICE.PUMP_NO2": { status: "OUT OF SERVICE", detail: "รอบ 1,120 แต่ flow และ pressure ไม่ขึ้น", repair_no: "RP-004" }
+        };
+
+        // ตั้งค่า Default
+        machinesMap.forEach(m => {
+            if(!machineData[m.id]) machineData[m.id] = { status: "READY", detail: "", repair_no: "" };
+        });
+
+        renderMap();
+        renderAlerts();
+        
+        // สั่งให้ scale ใหม่อีกครั้งหลังจาก render ของเข้าไป
+        setTimeout(scaleMap, 50);
+    }
+
+    /* ==========================================
+       5. Render UI
+    ========================================== */
+    function renderMap() {
+        const mapContainer = document.getElementById('mapContainer');
+        // ล้างกล่องเดิมทิ้ง
+        document.querySelectorAll('.building-container').forEach(e => e.remove());
+
+        // วาดตึก
+        buildingsConfig.forEach(b => {
+            const container = document.createElement('div');
+            container.className = 'building-container';
+            container.style.left = b.left;
+            container.style.top = b.top;
+            if(b.width) container.style.width = b.width;
+
+            const title = document.createElement('div');
+            title.className = 'building-title';
+            title.innerText = b.title;
+            container.appendChild(title);
+
+            const box = document.createElement('div');
+            box.className = `building-box layout-${b.layout}`;
+            box.id = b.id;
+            container.appendChild(box);
+
+            mapContainer.appendChild(container);
+        });
+
+        // ใส่เครื่องจักรลงตึก
+        machinesMap.forEach(m => {
+            const box = document.getElementById(m.b);
+            if(box) {
+                const item = document.createElement('div');
+                item.className = 'machine-item';
+                
+                if(box.classList.contains('layout-circle')) item.classList.add('circle-text');
+
+                const stat = machineData[m.id]?.status || "READY";
+                const dotClass = stat === "OUT OF SERVICE" ? "out" : "";
+
+                item.innerHTML = `<div class="status-dot ${dotClass}"></div><span>${m.label}</span>`;
+                box.appendChild(item);
+            }
+        });
+    }
+
+    function renderAlerts() {
+        const container = document.getElementById('alertCardsContainer');
+        container.innerHTML = '';
+        let hasError = false;
+
+        machinesMap.forEach(m => {
+            const data = machineData[m.id];
+            if(data && data.status === "OUT OF SERVICE") {
+                hasError = true;
+                const card = document.createElement('div');
+                card.className = 'alert-card';
+                card.innerHTML = `
+                    <h4>🔧 ${m.id}</h4>
+                    <p><strong>สถานะ:</strong> <span style="color:var(--color-out)">Out of Service</span></p>
+                    <p><strong>รายละเอียด:</strong> ${data.detail || '-'}</p>
+                    <p><strong>เลขแจ้งซ่อม:</strong> ${data.repair_no || '-'}</p>
+                `;
+                container.appendChild(card);
+            }
+        });
+
+        if(!hasError) {
+            container.innerHTML = '<p style="color:#666; text-align:center; padding: 20px;">✅ อุปกรณ์ทำงานปกติทั้งหมด</p>';
+        }
+    }
+
+    /* ==========================================
+       6. Login & Admin Panel Logic
+    ========================================== */
+    function openLoginModal() { document.getElementById('loginModal').style.display = 'flex'; }
+    function closeLoginModal() { document.getElementById('loginModal').style.display = 'none'; }
+
+    function login() {
+        const u = document.getElementById('username').value;
+        const p = document.getElementById('password').value;
+        if(u === 'operator' && p === 'operator') {
+            closeLoginModal();
+            openAdminPanel();
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+        } else {
+            alert('รหัสผ่านไม่ถูกต้อง');
+        }
+    }
+
+    function openAdminPanel() {
+        document.getElementById('adminPanel').style.display = 'flex';
+        renderAdminForm();
+    }
+    function closeAdmin() {
+        document.getElementById('adminPanel').style.display = 'none';
+    }
+
+    function renderAdminForm() {
+        const container = document.getElementById('adminFormContainer');
+        let html = '<table class="edit-table"><thead><tr><th>ชื่ออุปกรณ์</th><th>สถานะ</th><th>รายละเอียด</th><th>เลขแจ้งซ่อม</th></tr></thead><tbody>';
+        
+        machinesMap.forEach(m => {
+            const d = machineData[m.id] || { status: 'READY', detail: '', repair_no: '' };
+            const selReady = d.status === 'READY' ? 'selected' : '';
+            const selOut = d.status === 'OUT OF SERVICE' ? 'selected' : '';
+            
+            html += `
+                <tr>
+                    <td><strong>${m.id}</strong></td>
+                    <td>
+                        <select id="stat_${m.id}">
+                            <option value="READY" ${selReady}>READY</option>
+                            <option value="OUT OF SERVICE" ${selOut}>OUT OF SERVICE</option>
+                        </select>
+                    </td>
+                    <td><input type="text" id="det_${m.id}" value="${d.detail}" placeholder="รายละเอียด"></td>
+                    <td><input type="text" id="rep_${m.id}" value="${d.repair_no}" placeholder="เลขแจ้งซ่อม"></td>
+                </tr>
+            `;
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    async function saveData() {
+        machinesMap.forEach(m => {
+            machineData[m.id] = {
+                status: document.getElementById(`stat_${m.id}`).value,
+                detail: document.getElementById(`det_${m.id}`).value,
+                repair_no: document.getElementById(`rep_${m.id}`).value
+            };
+        });
+
+        // [สำหรับรันจริง PHP]
+        // try {
+        //     await fetch('?action=save', {
+        //         method: 'POST',
+        //         headers: { 'Content-Type': 'application/json' },
+        //         body: JSON.stringify(machineData)
+        //     });
+        //     alert('บันทึกสำเร็จ!');
+        // } catch(e) { alert('เกิดข้อผิดพลาดในการบันทึก'); }
+
+        alert('บันทึกข้อมูลเรียบร้อยแล้ว! (Preview Mode)');
+        renderMap();
+        renderAlerts();
+        closeAdmin();
+    }
+</script>
+</body>
+</html>
