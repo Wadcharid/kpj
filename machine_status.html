@@ -287,39 +287,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
        - ปรับตำแหน่ง Top และ Left ใหม่ทั้งหมดเพื่อแก้ปัญหา Overlap
     ========================================== */
     const buildingsConfig = [
-        // Column 1
+        // กลุ่ม 1 (น้ำดิบ)
         { id: 'b_raw1', title: 'RAW WATER 1', left: '90px', top: '50px', layout: 'col' },
-        { id: 'b_raw2', title: 'RAW WATER 2', left: '90px', top: '350px', layout: 'col' },
+        { id: 'b_raw2', title: 'RAW WATER 2', left: '90px', top: '300px', layout: 'col' },
         
-        // Column 2
+        // กลุ่ม 2 (สารเคมี 1)
         { id: 'b_alum12', title: 'ALUM 1-2', left: '210px', top: '50px', layout: 'col' },
         { id: 'b_pac12', title: 'PAC 1-2', left: '210px', top: '170px', layout: 'col' },
-        { id: 'b_alum3', title: 'ALUM 3', left: '210px', top: '380px', layout: 'col' },
-        { id: 'b_alum4', title: 'ALUM 4', left: '210px', top: '520px', layout: 'col' },
-        { id: 'b_pac', title: 'PAC', left: '210px', top: '670px', layout: 'col' },
-
-        // Column 3
         { id: 'b_evap1', title: 'EVAP', left: '290px', top: '50px', layout: 'col' },
         { id: 'b_chlo1', title: 'CHLO.', left: '290px', top: '170px', layout: 'col' },
+        { id: 'b_boost1', title: 'BOOSTER', left: '370px', top: '170px', layout: 'col' },
+        { id: 'b_poly1', title: 'Polymer 1-2', left: '370px', top: '50px', layout: 'col' },
+        
+        // กลุ่ม 3 (สารเคมี 2)
+        { id: 'b_alum3', title: 'ALUM 3', left: '210px', top: '380px', layout: 'col' },
+        { id: 'b_alum4', title: 'ALUM 4', left: '210px', top: '520px', layout: 'col' },
         { id: 'b_evap2', title: 'EVAP.', left: '290px', top: '380px', layout: 'col' },
         { id: 'b_chlo2', title: 'CHLO.', left: '290px', top: '590px', layout: 'col' },
-
-        // Column 4 (สารเคมี)
-        { id: 'b_poly1', title: 'Polymer 1-2', left: '370px', top: '50px', layout: 'col' },
-        { id: 'b_boost1', title: 'BOOSTER', left: '370px', top: '170px', layout: 'col' },
+        { id: 'b_pac', title: 'PAC 3-4', left: '210px', top: '670px', layout: 'col' },
         { id: 'b_poly2', title: 'Polymer 3-4', left: '370px', top: '380px', layout: 'col' },
-        { id: 'b_boost2', title: 'BOOSTER PRE-CL2', left: '370px', top: '590px', layout: 'col' },
-
-        // Column 5 (Middle & Circles)
+        { id: 'b_boost2', title: 'BOOSTER PRE-CL2', left: '370px', top: '590px', layout: 'col' },      
+        
+        // กลุ่ม 4 (ถังตกตะกอน 1-2)
         { id: 'b_cfs1b', title: 'CFS1B', left: '470px', top: '50px', layout: 'col' },
         { id: 'b_cfs1a', title: 'CFS1A', left: '570px', top: '50px', layout: 'col' },
-        { id: 'b_sludge1', title: 'SLUDGE 1', left: '470px', top: '160px', layout: 'row', width: '70px' },
-        { id: 'b_sludge2', title: 'SLUDGE 2', left: '570px', top: '160px', layout: 'row', width: '70px' },
+        { id: 'b_cfs2b', title: 'CFS2B', left: '470px', top: '120px', layout: 'col' },
+        { id: 'b_cfs2a', title: 'CFS2A', left: '570px', top: '120px', layout: 'col' },
+        { id: 'b_sludge1', title: 'SLUDGE 1', left: '470px', top: '200px', layout: 'row', width: '70px' },
+        { id: 'b_sludge2', title: 'SLUDGE 2', left: '570px', top: '200px', layout: 'row', width: '70px' },
 
+        // Column 5 (Middle & Circles)
         { id: 'b_cfs3a', title: 'CFS3A', left: '460px', top: '380px', layout: 'circle' },
         { id: 'b_cfs3b', title: 'CFS3B', left: '580px', top: '380px', layout: 'circle' },
-        { id: 'b_sludge3', title: 'SLUDGE 3', left: '520px', top: '510px', layout: 'row', width: '70px' },
-        
+        { id: 'b_sludge3', title: 'SLUDGE 3', left: '520px', top: '510px', layout: 'row', width: '70px' },        
         { id: 'b_cfs4a', title: 'CFS4A', left: '460px', top: '610px', layout: 'circle' },
         { id: 'b_cfs4b', title: 'CFS4B', left: '580px', top: '610px', layout: 'circle' },
         { id: 'b_sludge4', title: 'SLUDGE 4', left: '520px', top: '740px', layout: 'row', width: '70px' },
@@ -373,12 +373,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
         { id: 'POLYMER2.1', label: '1', b: 'b_poly2' }, { id: 'POLYMER2.2', label: '2', b: 'b_poly2' }, { id: 'POLYMER2.3', label: '3', b: 'b_poly2' },
         { id: 'CHEM2.P_PRE_3A', label: '1', b: 'b_boost2' }, { id: 'CHEM2.P_PRE_4A', label: '2', b: 'b_boost2' },
 
-        // CFS
+        // CFS 1-2
         { id: 'CFS1B.FAN_B', label: 'NO.B', b: 'b_cfs1b' }, { id: 'CFS1B.FAN_D', label: 'NO.D', b: 'b_cfs1b' },
         { id: 'CFS1A.FAN_A', label: 'NO.A', b: 'b_cfs1a' }, { id: 'CFS1A.FAN_C', label: 'NO.C', b: 'b_cfs1a' },
+        { id: 'CFS2B.FAN_B', label: 'NO.B', b: 'b_cfs2b' }, { id: 'CFS2B.FAN_D', label: 'NO.D', b: 'b_cfs2b' },
+        { id: 'CFS2A.FAN_A', label: 'NO.A', b: 'b_cfs2a' }, { id: 'CFS2A.FAN_C', label: 'NO.C', b: 'b_cfs2a' },
         { id: 'SLUDGE_PUMP_1', label: '1', b: 'b_sludge1' }, { id: 'SLUDGE_PUMP_2', label: '2', b: 'b_sludge1' }, { id: 'SLUDGE_PUMP_3', label: '3', b: 'b_sludge1' },
         { id: 'SLUDGE_PUMP_4', label: '1', b: 'b_sludge2' }, { id: 'SLUDGE_PUMP_5', label: '2', b: 'b_sludge2' }, { id: 'SLUDGE_PUMP_6', label: '3', b: 'b_sludge2' },
         
+        // CFS 3-4        
         { id: 'CFS3A_TURBINE', label: 'TURBINE', b: 'b_cfs3a' }, { id: 'CFS3A_SCRAPER', label: 'SCRAPPER', b: 'b_cfs3a' },
         { id: 'CFS3B_TURBINE', label: 'TURBINE', b: 'b_cfs3b' }, { id: 'CFS3B_SCRAPER', label: 'SCRAPPER', b: 'b_cfs3b' },
         { id: 'SLUDGE3_PUMP_1', label: '1', b: 'b_sludge3' }, { id: 'SLUDGE3_PUMP_2', label: '2', b: 'b_sludge3' }, { id: 'SLUDGE3_PUMP_3', label: '3', b: 'b_sludge3' },
