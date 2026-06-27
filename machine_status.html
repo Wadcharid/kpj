@@ -94,10 +94,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
             align-items: flex-start;
         }
 
-        /* -- กล่องจำลองขนาด 1300x880 (ใช้จัดการย่อ-ขยายสัดส่วน) -- */
+        /* -- กล่องจำลองขนาด (ใช้จัดการย่อ-ขยายสัดส่วน) -- */
         #mapContainer {
             width: 1300px;
-            height: 880px;
+            height: 850px; /* ขยายความสูงขึ้นเพื่อไม่ให้เบียด */
             position: absolute;
             top: 0;
             left: 0;
@@ -142,8 +142,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
         .layout-col { flex-direction: column; }
         .layout-row { flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: center;}
         .layout-circle { 
-            border-radius: 50%; padding: 15px; 
-            width: 90px; height: 90px;
+            border-radius: 50%; padding: 10px; 
+            width: 100px; height: 100px; /* ปรับขนาดให้พอดี ไม่ให้ข้อความดันวงกลมจนซ้อนกัน */
             display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; 
         }
 
@@ -165,7 +165,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
             display: flex; flex-direction: column; align-items: center; justify-content: space-around; 
             padding: 20px 0; font-size: 11px; font-weight: bold; text-align: center; color: #fff;
         }
-        .water-path::before { content: '↑'; font-size: 26px; color: rgba(255,255,255,0.7); }
 
         /* ================= CARDS (RIGHT SIDEBAR) ================= */
         .alert-card {
@@ -237,8 +236,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
                 </div>
 
                 <!-- Water Paths -->
-                <div class="water-path" style="left: 30px; top: 60px; height: 280px;">TRASH<br>RACK 1</div>
-                <div class="water-path" style="left: 30px; top: 480px; height: 280px;">TRASH<br>RACK 2</div>
+                <div class="water-path" style="left: 30px; top: 50px; height: 720px; justify-content: center; padding: 0;">
+                    <span style="transform: rotate(-90deg); white-space: nowrap; font-size: 14px; letter-spacing: 3px;">RAW WATER BASIN</span>
+                </div>
 
                 <!-- Buildings will be generated here by JS -->
             </div>
@@ -283,68 +283,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
 
 <script>
     /* ==========================================
-       1. โครงสร้างอาคาร (Layout Config - พิกัดเป๊ะๆ ตาม Canvas 1300x880)
+       1. โครงสร้างอาคาร (Layout Config - พิกัดเป๊ะๆ ตาม Canvas 1300x850)
+       - ปรับตำแหน่ง Top และ Left ใหม่ทั้งหมดเพื่อแก้ปัญหา Overlap
     ========================================== */
     const buildingsConfig = [
         // Column 1
-        { id: 'b_raw1', title: 'RAW WATER 1', left: '100px', top: '50px', layout: 'col' },
-        { id: 'b_raw2', title: 'RAW WATER 2', left: '100px', top: '480px', layout: 'col' },
+        { id: 'b_raw1', title: 'RAW WATER 1', left: '90px', top: '50px', layout: 'col' },
+        { id: 'b_raw2', title: 'RAW WATER 2', left: '90px', top: '380px', layout: 'col' },
         
         // Column 2
-        { id: 'b_alum12', title: 'ALUM 1-2', left: '230px', top: '50px', layout: 'col' },
-        { id: 'b_pac12', title: 'PAC 1-2', left: '230px', top: '200px', layout: 'col' },
-        { id: 'b_alum3', title: 'ALUM 3', left: '230px', top: '480px', layout: 'col' },
-        { id: 'b_alum4', title: 'ALUM 4', left: '230px', top: '610px', layout: 'col' },
-        { id: 'b_pac', title: 'PAC', left: '230px', top: '740px', layout: 'col' },
+        { id: 'b_alum12', title: 'ALUM 1-2', left: '210px', top: '50px', layout: 'col' },
+        { id: 'b_pac12', title: 'PAC 1-2', left: '210px', top: '210px', layout: 'col' },
+        { id: 'b_alum3', title: 'ALUM 3', left: '210px', top: '380px', layout: 'col' },
+        { id: 'b_alum4', title: 'ALUM 4', left: '210px', top: '520px', layout: 'col' },
+        { id: 'b_pac', title: 'PAC', left: '210px', top: '670px', layout: 'col' },
 
         // Column 3
-        { id: 'b_evap1', title: 'EVAP', left: '310px', top: '50px', layout: 'col' },
-        { id: 'b_chlo1', title: 'CHLO.', left: '310px', top: '200px', layout: 'col' },
-        { id: 'b_evap2', title: 'EVAP.', left: '310px', top: '480px', layout: 'col' },
-        { id: 'b_chlo2', title: 'CHLO.', left: '310px', top: '670px', layout: 'col' },
+        { id: 'b_evap1', title: 'EVAP', left: '290px', top: '50px', layout: 'col' },
+        { id: 'b_chlo1', title: 'CHLO.', left: '290px', top: '210px', layout: 'col' },
+        { id: 'b_evap2', title: 'EVAP.', left: '290px', top: '380px', layout: 'col' },
+        { id: 'b_chlo2', title: 'CHLO.', left: '290px', top: '590px', layout: 'col' },
 
-        // Column 4 (เปลี่ยนจาก CAUSTIC SODA เป็น Polymer)
-        { id: 'b_poly1', title: 'Polymer 1-2', left: '390px', top: '50px', layout: 'col' },
-        { id: 'b_boost1', title: 'BOOSTER', left: '390px', top: '200px', layout: 'col' },
-        { id: 'b_poly2', title: 'Polymer 3-4', left: '390px', top: '480px', layout: 'col' },
-        { id: 'b_boost2', title: 'BOOSTER PRE-CL2', left: '390px', top: '670px', layout: 'col' },
+        // Column 4 
+        { id: 'b_poly1', title: 'Polymer 1-2', left: '370px', top: '50px', layout: 'col' },
+        { id: 'b_boost1', title: 'BOOSTER', left: '370px', top: '210px', layout: 'col' },
+        { id: 'b_poly2', title: 'Polymer 3-4', left: '370px', top: '380px', layout: 'col' },
+        { id: 'b_boost2', title: 'BOOSTER PRE-CL2', left: '370px', top: '590px', layout: 'col' },
 
-        // Column 5 (Middle)
-        { id: 'b_cfs1b', title: 'CFS1B', left: '500px', top: '50px', layout: 'col' },
-        { id: 'b_cfs1a', title: 'CFS1A', left: '580px', top: '50px', layout: 'col' },
-        { id: 'b_sludge1', title: 'SLUDGE 1', left: '500px', top: '150px', layout: 'row', width: '70px' },
-        { id: 'b_sludge2', title: 'SLUDGE 2', left: '580px', top: '150px', layout: 'row', width: '70px' },
+        // Column 5 (Middle & Circles)
+        { id: 'b_cfs1b', title: 'CFS1B', left: '470px', top: '50px', layout: 'col' },
+        { id: 'b_cfs1a', title: 'CFS1A', left: '570px', top: '50px', layout: 'col' },
+        { id: 'b_sludge1', title: 'SLUDGE 1', left: '470px', top: '160px', layout: 'row', width: '70px' },
+        { id: 'b_sludge2', title: 'SLUDGE 2', left: '570px', top: '160px', layout: 'row', width: '70px' },
 
-        { id: 'b_cfs3a', title: 'CFS3A', left: '490px', top: '480px', layout: 'circle' },
-        { id: 'b_cfs3b', title: 'CFS3B', left: '590px', top: '480px', layout: 'circle' },
-        { id: 'b_sludge3', title: 'SLUDGE 3', left: '550px', top: '600px', layout: 'row', width: '70px' },
+        { id: 'b_cfs3a', title: 'CFS3A', left: '460px', top: '380px', layout: 'circle' },
+        { id: 'b_cfs3b', title: 'CFS3B', left: '580px', top: '380px', layout: 'circle' },
+        { id: 'b_sludge3', title: 'SLUDGE 3', left: '520px', top: '510px', layout: 'row', width: '70px' },
         
-        { id: 'b_cfs4a', title: 'CFS4A', left: '490px', top: '680px', layout: 'circle' },
-        { id: 'b_cfs4b', title: 'CFS4B', left: '590px', top: '680px', layout: 'circle' },
-        { id: 'b_sludge4', title: 'SLUDGE 4', left: '550px', top: '800px', layout: 'row', width: '70px' },
+        { id: 'b_cfs4a', title: 'CFS4A', left: '460px', top: '610px', layout: 'circle' },
+        { id: 'b_cfs4b', title: 'CFS4B', left: '580px', top: '610px', layout: 'circle' },
+        { id: 'b_sludge4', title: 'SLUDGE 4', left: '520px', top: '740px', layout: 'row', width: '70px' },
 
         // Column 6 (Filters)
-        { id: 'b_filter1', title: 'FILTER PH. 1', left: '710px', top: '50px', layout: 'row', width: '230px' },
-        { id: 'b_filter2', title: 'FILTER PH. 2', left: '710px', top: '130px', layout: 'row', width: '230px' },
-        { id: 'b_bw1', title: 'BACKWASH 1', left: '710px', top: '210px', layout: 'row', width: '180px' },
-        { id: 'b_wws1', title: 'WWS 1', left: '900px', top: '210px', layout: 'row', width: '90px' },
+        { id: 'b_filter1', title: 'FILTER PH. 1', left: '700px', top: '50px', layout: 'row', width: '230px' },
+        { id: 'b_filter2', title: 'FILTER PH. 2', left: '700px', top: '130px', layout: 'row', width: '230px' },
+        { id: 'b_bw1', title: 'BACKWASH 1', left: '700px', top: '220px', layout: 'row', width: '180px' },
+        { id: 'b_wws1', title: 'WWS 1', left: '900px', top: '220px', layout: 'row', width: '90px' },
 
-        { id: 'b_filter3', title: 'FILTER PH. 3', left: '710px', top: '480px', layout: 'row', width: '200px' },
-        { id: 'b_wws3', title: 'WWS 3', left: '920px', top: '480px', layout: 'row', width: '90px' },
-        { id: 'b_bw2', title: 'BACKWASH 2', left: '920px', top: '560px', layout: 'row', width: '180px' },
+        { id: 'b_filter3', title: 'FILTER PH. 3', left: '700px', top: '380px', layout: 'row', width: '200px' },
+        { id: 'b_wws3', title: 'WWS 3', left: '920px', top: '380px', layout: 'row', width: '90px' },
+        { id: 'b_bw2', title: 'BACKWASH 2', left: '920px', top: '490px', layout: 'row', width: '180px' },
         
-        { id: 'b_filter4', title: 'FILTER PH. 4', left: '710px', top: '660px', layout: 'row', width: '200px' },
-        { id: 'b_wws4', title: 'WWS 4', left: '920px', top: '660px', layout: 'row', width: '90px' },
+        { id: 'b_filter4', title: 'FILTER PH. 4', left: '700px', top: '610px', layout: 'row', width: '200px' },
+        { id: 'b_wws4', title: 'WWS 4', left: '920px', top: '610px', layout: 'row', width: '90px' },
 
-        // Column 7
-        { id: 'b_dps', title: 'DPS.', left: '1080px', top: '200px', layout: 'col' },
-        { id: 'b_tps', title: 'TPS.', left: '1080px', top: '480px', layout: 'col' },
-        { id: 'b_service', title: 'SERVICE', left: '1080px', top: '610px', layout: 'col' },
-        { id: 'b_boost_post', title: 'BOOSTER POST-CL2', left: '1080px', top: '740px', layout: 'col' }
+        // Column 7 (ขยับแกนซ้ายไปที่ 1130px เพื่อหลบ BACKWASH 2)
+        { id: 'b_dps', title: 'DPS.', left: '1130px', top: '210px', layout: 'col' },
+        { id: 'b_tps', title: 'TPS.', left: '1130px', top: '380px', layout: 'col' },
+        { id: 'b_service', title: 'SERVICE', left: '1130px', top: '540px', layout: 'col' },
+        { id: 'b_boost_post', title: 'BOOSTER POST-CL2', left: '1130px', top: '670px', layout: 'col' }
     ];
 
     /* ==========================================
-       2. ข้อมูลเครื่องจักรและตำแหน่ง (จัดเรียงตามรูปต้นฉบับเป๊ะ)
+       2. ข้อมูลเครื่องจักรและตำแหน่ง
     ========================================== */
     const machinesMap = [
         // RAW WATER
@@ -423,7 +424,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
         
         // ขนาดตั้งต้นของ Canvas
         const targetWidth = 1300; 
-        const targetHeight = 900;
+        const targetHeight = 850;
         
         // คำนวณอัตราส่วนการย่อ-ขยาย ตามความกว้างของ mapArea ณ ตอนนั้น
         const scale = mapArea.clientWidth / targetWidth;
